@@ -9,6 +9,17 @@
   --kr: 'Noto Sans KR', 'Inter', system-ui, sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --gutter: clamp(16px, 4vw, 56px);
+
+  /* 비행 HUD · 스캔 팝업 (사이버펑크) */
+  --cy: #46f2ff;
+  --cy-dim: rgba(70, 242, 255, 0.62);
+  --cy-faint: rgba(70, 242, 255, 0.22);
+  --mg: #ff3fb0;
+  --am: #ffb454;
+  --warn: #ff4a5c;
+  --glass: rgba(4, 9, 20, 0.78);
+  --display: 'Orbitron', 'Inter', sans-serif;
+  --hud: 'Share Tech Mono', 'JetBrains Mono', ui-monospace, monospace;
   color-scheme: dark;
 }
 
@@ -20,7 +31,9 @@
 
 html,
 body {
+  height: 100%;
   margin: 0;
+  overflow: hidden;
   background: #000;
   color: var(--ink);
 }
@@ -29,19 +42,20 @@ body {
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
+  overscroll-behavior: none;
 }
 
 ::selection {
   background: rgba(255, 201, 143, 0.3);
 }
 
-/* ── 3D 무대: 고정된 배경, 터치/휠은 문서 스크롤로 통과 ───────────────── */
+/* ── 3D 무대: 클릭하면 비행 시작 · 마우스 고정 ──────────────────────────── */
 .stage {
   position: fixed;
   inset: 0;
   z-index: 0;
-  pointer-events: none;
+  cursor: crosshair;
+  touch-action: none;
 }
 
 .stage canvas {
@@ -56,11 +70,11 @@ body {
 /* 인트로 전에는 숨겨 두고 gsap이 autoAlpha로 드러냅니다 */
 .chrome,
 .panel-dock,
-.scroll-hint__inner,
+.engage,
+.flight-layer,
 .hero__eyebrow,
 .quote__word,
-.quote__cite,
-[data-reveal] {
+.quote__cite {
   opacity: 0;
   visibility: hidden;
 }
@@ -99,7 +113,7 @@ body {
   justify-content: space-between;
   align-items: flex-start;
   gap: 24px;
-  padding: calc(var(--gutter) * 0.7) var(--gutter);
+  padding: calc(var(--gutter) * 0.6) var(--gutter);
   pointer-events: none;
 }
 
@@ -109,59 +123,64 @@ body {
 }
 
 .brand__mark {
-  font: 400 13px/1 var(--sans);
-  letter-spacing: 0.62em;
+  font: 600 13px/1 var(--display);
+  letter-spacing: 0.55em;
   text-transform: uppercase;
+  text-shadow: 0 0 18px rgba(70, 242, 255, 0.35);
 }
 
-.brand__sub,
-.hud dt {
-  font: 300 9.5px/1 var(--mono);
-  letter-spacing: 0.22em;
+.brand__sub {
+  font: 400 10px/1 var(--hud);
+  letter-spacing: 0.28em;
   text-transform: uppercase;
-  color: var(--ink-faint);
+  color: var(--cy-dim);
 }
 
 .hud {
   display: flex;
-  gap: clamp(16px, 3vw, 40px);
+  gap: clamp(14px, 2.4vw, 34px);
   margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--cy-faint);
+  background: linear-gradient(90deg, rgba(70, 242, 255, 0.06), transparent 70%);
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
   text-align: right;
 }
 
 .hud div {
   display: grid;
-  gap: 8px;
+  gap: 7px;
 }
 
 .hud dt {
+  font: 400 9.5px/1 var(--hud);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
   white-space: nowrap;
+  color: var(--cy-dim);
 }
 
 .hud dd {
   margin: 0;
-  font: 400 12px/1 var(--mono);
-  letter-spacing: 0.08em;
-  color: var(--ink-dim);
+  font: 400 13px/1 var(--hud);
+  letter-spacing: 0.06em;
+  color: #e8fdff;
   font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 10px rgba(70, 242, 255, 0.45);
 }
 
 .hud__render dd {
   text-transform: uppercase;
 }
 
-/* ── 히어로: 칼 세이건 인용 ─────────────────────────────────────────────── */
-.journey {
-  position: relative;
-}
-
+/* ── 히어로: 칼 세이건 인용 (비행을 시작하면 물러납니다) ─────────────────── */
 .hero {
+  position: fixed;
+  inset: auto 0 clamp(96px, 16vh, 170px);
   display: flex;
-  align-items: flex-end;
   justify-content: center;
-  min-height: 100vh;
-  min-height: 100svh;
-  padding: 0 var(--gutter) clamp(72px, 11vh, 140px);
+  padding: 0 var(--gutter);
+  pointer-events: none;
 }
 
 .hero__inner {
@@ -171,8 +190,7 @@ body {
   text-align: center;
 }
 
-.hero__eyebrow,
-.chapter__index {
+.hero__eyebrow {
   margin: 0;
   font: 300 10px/1 var(--mono);
   letter-spacing: 0.42em;
@@ -211,115 +229,490 @@ body {
   text-shadow: none;
 }
 
-/* ── 챕터 ───────────────────────────────────────────────────────────────── */
-.chapter {
-  display: flex;
-  align-items: center;
-  min-height: 100vh;
-  min-height: 100svh;
-  padding: 0 var(--gutter);
+/* ── 비행 시작 안내 ─────────────────────────────────────────────────────── */
+.engage {
+  position: fixed;
+  left: 50%;
+  bottom: clamp(36px, 7vh, 72px);
+  z-index: 15;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  text-align: center;
 }
 
-.chapter__card {
-  position: relative;
-  max-width: 410px;
-  padding: 28px 0;
+.engage__btn {
+  padding: 10px 18px;
+  border: 1px solid var(--cy);
+  background: rgba(70, 242, 255, 0.08);
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  font: 600 12px/1 var(--display);
+  letter-spacing: 0.32em;
+  color: var(--cy);
+  text-shadow: 0 0 12px var(--cy);
+  animation: pulse 1.8s ease-in-out infinite;
 }
 
-/* 원반이 밝은 구간에서도 읽히도록 카드 뒤에 부드러운 어둠을 깔아 줍니다 */
-.chapter__card::before {
-  content: '';
-  position: absolute;
-  inset: -35% -45%;
-  z-index: -1;
-  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0.4) 60%, transparent);
+.engage__sub {
+  font: 400 11px/1.4 var(--kr);
+  letter-spacing: 0.04em;
+  color: var(--cy-dim);
+}
+
+.engage--hint {
+  bottom: 92px;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.45;
+    box-shadow: 0 0 0 transparent;
+  }
+}
+
+/* ── 조준선 ─────────────────────────────────────────────────────────────── */
+.reticle {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 10;
+  width: 34px;
+  height: 34px;
+  transform: translate(-50%, -50%);
   pointer-events: none;
 }
 
-.chapter__index {
+.reticle i {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--cy-dim);
+}
+
+.reticle i:nth-child(1) {
+  top: 0;
+  left: 0;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.reticle i:nth-child(2) {
+  top: 0;
+  right: 0;
+  border-left: 0;
+  border-bottom: 0;
+}
+
+.reticle i:nth-child(3) {
+  bottom: 0;
+  left: 0;
+  border-right: 0;
+  border-top: 0;
+}
+
+.reticle i:nth-child(4) {
+  bottom: 0;
+  right: 0;
+  border-left: 0;
+  border-top: 0;
+}
+
+.reticle b {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  margin: -1.5px 0 0 -1.5px;
+  background: var(--cy);
+  box-shadow: 0 0 8px var(--cy);
+}
+
+/* ── 반지름 게이지 ──────────────────────────────────────────────────────── */
+.gauge {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  z-index: 10;
+  width: min(620px, 70vw);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.gauge__track {
+  position: relative;
+  height: 2px;
+  background: linear-gradient(90deg, var(--warn), var(--mg) 18%, var(--cy) 55%, var(--cy-faint));
+  box-shadow: 0 0 10px rgba(70, 242, 255, 0.35);
+}
+
+.gauge__tick {
+  position: absolute;
+  top: -5px;
+  width: 1px;
+  height: 12px;
+  background: rgba(232, 253, 255, 0.7);
+  transition: left 0.15s linear;
+}
+
+.gauge__tick em {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font: 400 9.5px/1 var(--hud);
+  font-style: normal;
+  white-space: nowrap;
+  color: var(--cy-dim);
+}
+
+.gauge__tick:nth-child(even) em {
+  bottom: auto;
+  top: 16px;
+}
+
+.gauge__marker {
+  position: absolute;
+  top: -9px;
+  width: 0;
+  height: 0;
+  margin-left: -6px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid var(--am);
+  filter: drop-shadow(0 0 6px var(--am));
+}
+
+.gauge__scale {
   display: flex;
+  justify-content: space-between;
+  margin-top: 30px;
+  font: 400 8.5px/1 var(--hud);
+  letter-spacing: 0.24em;
+  color: rgba(70, 242, 255, 0.4);
+}
+
+/* ── 조작 안내 ──────────────────────────────────────────────────────────── */
+.keys {
+  position: fixed;
+  right: var(--gutter);
+  bottom: 84px;
+  z-index: 10;
+  display: grid;
+  justify-items: end;
+  pointer-events: none;
+}
+
+.keys__title {
+  margin: 0 0 10px;
+  font: 400 9.5px/1 var(--hud);
+  letter-spacing: 0.3em;
+  color: var(--cy-dim);
+}
+
+.keys ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 400 11px/1 var(--kr);
+  color: rgba(232, 253, 255, 0.75);
+}
+
+.keys li {
+  display: flex;
+  justify-content: flex-end;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
 }
 
-.chapter__index span {
-  width: 48px;
-  height: 1px;
-  background: currentColor;
-  opacity: 0.6;
+.keys li > span {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 3px;
+  min-width: 108px;
 }
 
-.chapter__title {
-  margin: 20px 0 0;
-  font: 300 clamp(34px, 3.6vw, 52px) / 1.02 var(--serif);
-  letter-spacing: -0.01em;
+.keys kbd {
+  padding: 3px 6px;
+  border: 1px solid var(--cy-faint);
+  background: rgba(70, 242, 255, 0.06);
+  font: 400 9.5px/1 var(--hud);
+  color: var(--cy);
 }
 
-.chapter__lead {
-  margin: 14px 0 0;
-  font: 400 clamp(16px, 1.4vw, 19px) / 1.5 var(--kr);
-  color: var(--ink);
-}
-
-.chapter__body {
-  margin: 14px 0 0;
-  font: 300 14.5px/1.85 var(--kr);
-  color: rgba(243, 237, 227, 0.82);
-  word-break: keep-all;
-  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.8);
-}
-
-.chapter__data {
-  margin: 22px 0 0;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
-  font: 300 10.5px/1.4 var(--mono);
-  letter-spacing: 0.16em;
-  color: var(--ink-dim);
-}
-
-/* ── 스크롤 안내 ────────────────────────────────────────────────────────── */
-.scroll-hint {
+/* ── 스캔 팝업 (사이버펑크) ─────────────────────────────────────────────── */
+.scan {
+  --accent-c: var(--cy);
+  --accent-glow: rgba(70, 242, 255, 0.32);
   position: fixed;
   left: var(--gutter);
-  bottom: calc(var(--gutter) * 0.6);
-  z-index: 20;
+  top: 50%;
+  z-index: 12;
+  width: min(392px, calc(100vw - 2 * var(--gutter)));
+  transform: translateY(-50%);
+  filter: drop-shadow(0 0 16px var(--accent-glow));
   pointer-events: none;
 }
 
-.scroll-hint__inner {
-  display: flex;
-  flex-direction: row-reverse;
-  align-items: center;
-  gap: 14px;
-  font: 300 9.5px/1 var(--mono);
-  letter-spacing: 0.4em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
+.scan[data-accent='amber'] {
+  --accent-c: var(--am);
+  --accent-glow: rgba(255, 180, 84, 0.3);
 }
 
-.scroll-hint i {
+.scan[data-accent='magenta'] {
+  --accent-c: var(--mg);
+  --accent-glow: rgba(255, 63, 176, 0.32);
+}
+
+.scan[data-accent='red'] {
+  --accent-c: var(--warn);
+  --accent-glow: rgba(255, 74, 92, 0.42);
+}
+
+.scan__frame {
+  --cut: 18px;
+  padding: 1px;
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  background: linear-gradient(135deg, var(--accent-c), rgba(70, 242, 255, 0.18) 38%, rgba(255, 63, 176, 0.55));
+}
+
+.scan__inner {
+  --cut: 17px;
   position: relative;
-  width: 1px;
-  height: 42px;
-  overflow: hidden;
-  background: var(--line);
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  background:
+    radial-gradient(120% 70% at 0% 0%, color-mix(in srgb, var(--accent-c) 14%, transparent), transparent 60%),
+    linear-gradient(180deg, rgba(7, 14, 32, 0.9), rgba(3, 6, 14, 0.94));
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
-.scroll-hint i::after {
+/* 스캔라인 + 가끔 흐르는 밝은 띠 */
+.scan__inner::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: var(--ink);
-  transform: translateY(-100%);
-  animation: fall 2.4s cubic-bezier(0.7, 0, 0.3, 1) infinite;
+  background:
+    linear-gradient(180deg, transparent 0 46%, rgba(255, 255, 255, 0.05) 50%, transparent 54% 100%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 3px);
+  background-size: 100% 260%, auto;
+  animation: sweep 4.5s linear infinite;
+  pointer-events: none;
 }
 
-@keyframes fall {
-  60%,
-  100% {
-    transform: translateY(100%);
+@keyframes sweep {
+  from {
+    background-position: 0 -160%, 0 0;
   }
+  to {
+    background-position: 0 160%, 0 0;
+  }
+}
+
+.scan__bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 16px 9px 24px;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-c) 35%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent-c) 22%, transparent), transparent);
+  font: 400 10px/1 var(--hud);
+  letter-spacing: 0.18em;
+  color: var(--accent-c);
+}
+
+.scan__rec {
+  color: var(--mg);
+  animation: blink 1.1s steps(2) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+.scan__body {
+  padding: 16px 20px 6px;
+}
+
+.scan__en {
+  margin: 0;
+  font: 700 18px/1.1 var(--display);
+  letter-spacing: 0.12em;
+  color: var(--accent-c);
+  text-shadow: 0 0 14px var(--accent-glow), 2px 0 0 rgba(255, 63, 176, 0.35), -2px 0 0 rgba(70, 242, 255, 0.25);
+}
+
+.scan__title {
+  margin: 8px 0 0;
+  font: 500 17px/1.2 var(--kr);
+  color: #f2fbff;
+}
+
+.scan__desc {
+  margin: 12px 0 0;
+  font: 300 12.5px/1.75 var(--kr);
+  color: rgba(226, 244, 255, 0.82);
+  word-break: keep-all;
+}
+
+.scan__grid {
+  display: grid;
+  grid-template-columns: 112px 1fr;
+  gap: 14px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.scan__map {
+  width: 112px;
+  height: 112px;
+}
+
+.map__frame {
+  fill: rgba(70, 242, 255, 0.03);
+  stroke: var(--cy-faint);
+}
+
+.map__axis {
+  stroke: rgba(70, 242, 255, 0.12);
+  stroke-dasharray: 2 3;
+}
+
+.scan__map circle:not(.map__frame):not(.map__me) {
+  fill: none;
+  transition: stroke 0.4s, filter 0.4s;
+}
+
+.map__disk {
+  stroke: rgba(255, 180, 84, 0.35);
+}
+
+.map__planet {
+  stroke: rgba(70, 242, 255, 0.3);
+  stroke-dasharray: 1 3;
+}
+
+.map__isco {
+  stroke: rgba(255, 180, 84, 0.7);
+  stroke-dasharray: 3 2;
+}
+
+.map__photon {
+  stroke: rgba(255, 63, 176, 0.45);
+}
+
+.map__ergo {
+  stroke: rgba(255, 63, 176, 0.6);
+  stroke-dasharray: 2 2;
+}
+
+.scan__map .map__horizon {
+  fill: #000;
+  stroke: rgba(255, 74, 92, 0.8);
+}
+
+.scan__map .is-hot {
+  stroke: var(--accent-c);
+  filter: drop-shadow(0 0 4px var(--accent-c));
+}
+
+.map__me {
+  fill: var(--am);
+  filter: drop-shadow(0 0 4px var(--am));
+}
+
+.scan__rows {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.scan__rows div {
+  display: grid;
+  gap: 3px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed rgba(70, 242, 255, 0.14);
+}
+
+.scan__rows dt {
+  font: 300 10.5px/1.2 var(--kr);
+  color: rgba(226, 244, 255, 0.55);
+}
+
+.scan__rows dd {
+  margin: 0;
+  font: 400 13px/1.2 var(--hud);
+  color: var(--accent-c);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 8px var(--accent-glow);
+}
+
+.scan__foot {
+  display: flex;
+  gap: 16px;
+  padding: 10px 20px 12px;
+  font: 400 9.5px/1 var(--hud);
+  letter-spacing: 0.16em;
+  color: rgba(70, 242, 255, 0.45);
+}
+
+/* ── 모바일 터치 조작 ───────────────────────────────────────────────────── */
+.touch {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 18;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 0 18px 92px;
+  pointer-events: none;
+}
+
+.touch__stick {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border: 1px solid var(--cy-faint);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(70, 242, 255, 0.08), transparent 70%);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.touch__stick span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border: 1px solid var(--cy);
+  border-radius: 50%;
+  background: rgba(70, 242, 255, 0.15);
+  box-shadow: 0 0 14px rgba(70, 242, 255, 0.4);
+}
+
+.touch__buttons {
+  display: grid;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.touch__buttons button {
+  width: 54px;
+  height: 54px;
+  border: 1px solid var(--cy-faint);
+  background: rgba(4, 9, 20, 0.6);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  font: 400 16px/1 var(--hud);
+  color: var(--cy);
+  touch-action: none;
 }
 
 /* ── 물리 패널 ──────────────────────────────────────────────────────────── */
@@ -713,6 +1106,31 @@ body {
   text-underline-offset: 3px;
 }
 
+
+.panel__modes {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.panel__modes button {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-dim);
+  font: 400 12px/1 var(--kr);
+  cursor: pointer;
+  transition: color 0.3s, border-color 0.3s, background 0.3s;
+}
+
+.panel__modes button[aria-pressed='true'] {
+  color: var(--ink);
+  border-color: var(--accent);
+  background: rgba(255, 201, 143, 0.12);
+}
+
 /* ── 모바일 ─────────────────────────────────────────────────────────────── */
 @media (max-width: 720px) {
   .hud {
@@ -720,7 +1138,8 @@ body {
   }
 
   .hud .hud__render,
-  .hud .hud__spin {
+  .hud .hud__spin,
+  .hud .hud__speed {
     display: none;
   }
 
@@ -729,44 +1148,59 @@ body {
   }
 
   .hero {
-    padding-bottom: 20vh;
+    bottom: 22vh;
   }
 
   .quote {
     max-width: 13em;
   }
 
-  .chapter {
-    align-items: flex-end;
-    padding-bottom: 18vh;
+  .scan {
+    top: 86px;
+    transform: none;
   }
 
-  .chapter__card {
-    max-width: none;
+  .scan__desc {
+    display: none;
+  }
+
+  .scan__grid {
+    grid-template-columns: 84px 1fr;
+  }
+
+  .scan__map {
+    width: 84px;
+    height: 84px;
+  }
+
+  .gauge {
+    width: 84vw;
+    bottom: 18px;
+  }
+
+  .gauge__tick em {
+    font-size: 8px;
   }
 
   .panel-dock {
     left: var(--gutter);
     right: var(--gutter);
-    align-items: center;
+    bottom: 200px;
+    align-items: flex-end;
   }
 
   .panel {
     width: 100%;
-    max-height: 68vh;
+    max-height: 60vh;
     transform-origin: bottom center;
-  }
-
-  .scroll-hint {
-    left: 50%;
-    bottom: 76px;
-    transform: translateX(-50%);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .veil__text,
-  .scroll-hint i::after {
+  .engage__btn,
+  .scan__inner::after,
+  .scan__rec {
     animation: none;
   }
 

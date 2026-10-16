@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { activeQuality, dprForFactor, profileForFactor, type DeviceInfo } from '../lib/quality'
 import { AdaptiveQuality } from './AdaptiveQuality'
 import { BlackHole } from './BlackHole'
-import { CameraRig } from './CameraRig'
+import { FlightRig } from './FlightRig'
 import { Effects } from './Effects'
 import { StarDust } from './StarDust'
 
@@ -19,10 +19,10 @@ export function Experience({ device }: { device: DeviceInfo }) {
       flat
       dpr={initialDpr}
       gl={{ antialias: false, alpha: false, stencil: false, powerPreference: 'high-performance' }}
-      camera={{ fov: 40, near: 0.1, far: 1200, position: [0, 12, 146] }}
+      camera={{ fov: 55, near: 0.05, far: 1200, position: [0, 12, 146] }}
     >
       <AdaptiveQuality device={device} />
-      <CameraRig reducedMotion={device.reducedMotion} />
+      <FlightRig />
       <BlackHole skySize={device.skySize} />
       <StarDust />
       <Effects />

@@ -9,9 +9,9 @@ import {
   photonOrbitRadii,
 } from '../lib/kerr'
 import { PRESETS } from '../lib/presets'
-import { getUi, setUi, tweenPhysics, useUi, type PhysicsParams } from '../state/store'
+import { flyToView, getUi, setUi, tweenPhysics, useUi, type MorphMode, type PhysicsParams } from '../state/store'
 
-type NumericKey = Exclude<keyof PhysicsParams, 'lensing' | 'indigo' | 'morph'>
+type NumericKey = Exclude<keyof PhysicsParams, 'lensing' | 'indigo' | 'morph' | 'morphMode'>
 
 type SliderSpec = {
   key: NumericKey
@@ -32,15 +32,6 @@ const SLIDERS: SliderSpec[] = [
     step: 0.001,
     format: (v) => v.toFixed(3),
     hint: '그림자 모양 · 원반 안쪽 경계 · 틀 끌림. 음수면 원반이 반대로 공전',
-  },
-  {
-    key: 'inclination',
-    label: '관측 경사',
-    min: 0,
-    max: 80,
-    step: 0.5,
-    format: (v) => `${v.toFixed(1)}°`,
-    hint: '원반 평면에서 잰 시선 고도. 0°에 가까울수록 원반을 옆에서 봅니다',
   },
   {
     key: 'beaming',
@@ -88,6 +79,15 @@ const SLIDERS: SliderSpec[] = [
     hint: '원반이 ISCO보다 바깥에서 잘린 경우. 넓힐수록 도넛 → 가는 고리가 됩니다',
   },
   {
+    key: 'flow',
+    label: '고온 가스층',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    format: (v) => (v < 0.005 ? '없음' : `${Math.round(v * 100)}%`),
+    hint: '지평선까지 이어지는 두껍고 뜨거운 가스(EHT 관측 모델). 옆에서 보면 그림자 앞을 덮습니다',
+  },
+  {
     key: 'roll',
     label: '화면 회전',
     min: -90,
@@ -114,6 +114,11 @@ const SLIDERS: SliderSpec[] = [
     format: (v) => `10^${v.toFixed(1)} M☉`,
     hint: '질량은 크기만 바꿉니다. 모양은 스핀과 시선 각도로만 정해집니다',
   },
+]
+
+const MORPH_MODES: { id: MorphMode; label: string; hint: string }[] = [
+  { id: 'spin', label: '스핀 변화', hint: '스핀 a/M 하나만 +0.998 ↔ −0.998로 오갑니다 (순수한 물리 값 변화)' },
+  { id: 'inner', label: '안쪽 경계', hint: '원반이 잘리는 안쪽 경계만 ISCO ↔ 바깥 가장자리로 오갑니다' },
 ]
 
 export function PhysicsPanel() {
@@ -143,7 +148,10 @@ export function PhysicsPanel() {
               key={preset.id}
               type="button"
               aria-pressed={preset.id === presetId}
-              onClick={() => update(preset.params, preset.id)}
+              onClick={() => {
+                update(preset.params, preset.id)
+                flyToView(preset.view.inclination, preset.view.distance)
+              }}
             >
               {preset.label}
             </button>
@@ -159,8 +167,20 @@ export function PhysicsPanel() {
         >
           <i aria-hidden="true" />
           {params.morph ? '형태 변형 멈추기' : '형태 변형 재생'}
-          <span>원반 안쪽 경계를 자동으로 오갑니다</span>
+          <span>{MORPH_MODES.find((mode) => mode.id === params.morphMode)?.hint}</span>
         </button>
+        <div className="panel__modes" role="group" aria-label="형태 변형 방식">
+          {MORPH_MODES.map((mode) => (
+            <button
+              key={mode.id}
+              type="button"
+              aria-pressed={params.morphMode === mode.id}
+              onClick={() => update({ morphMode: mode.id })}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
 
         <div className="panel__sliders">
           {SLIDERS.map((spec) => (
@@ -176,7 +196,7 @@ export function PhysicsPanel() {
               </span>
               <input
                 type="range"
-                disabled={spec.key === 'inner' && params.morph}
+                disabled={params.morph && ((spec.key === 'spin' && params.morphMode === 'spin') || (spec.key === 'inner' && params.morphMode === 'inner'))}
                 min={spec.min}
                 max={spec.max}
                 step={spec.step}

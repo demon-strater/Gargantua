@@ -30,6 +30,32 @@ export function diskInnerRadius(a: number, outer: number, fraction: number) {
   return isco + (Math.max(outer, isco + 1) - isco) * fraction
 }
 
+/** 에르고스피어 바깥 경계 r_E(θ) = M + √(M² − a² cos²θ) — 적도에서 2M */
+export function ergosphereRadius(a: number, theta: number) {
+  const c = Math.cos(theta)
+  return 1 + Math.sqrt(Math.max(1 - a * a * c * c, 0))
+}
+
+/** ISCO 궤도의 단위 질량당 에너지 → 복사 효율 η = 1 − E (정지 질량 중 빛으로 바뀌는 비율) */
+export function radiativeEfficiency(a: number) {
+  const r = iscoRadius(a)
+  const r15 = Math.pow(r, 1.5)
+  const energy = (r15 - 2 * Math.sqrt(r) + a) / (Math.pow(r, 0.75) * Math.sqrt(r15 - 3 * Math.sqrt(r) + 2 * a))
+  return 1 - energy
+}
+
+/** 순행 케플러 각속도 Ω = 1 / (r^{3/2} + a) */
+export function keplerOmega(r: number, a: number) {
+  return 1 / (Math.pow(r, 1.5) + a)
+}
+
+/** 적도면 원반 온도 (셰이더와 같은 노비코프–손형 플럭스 근사) */
+export function diskTemperature(r: number, inner: number, peak: number) {
+  const x = r / inner
+  const flux = Math.max((1 - 0.95 / Math.sqrt(Math.max(x, 0.5))) / (x * x * x), 0) / 0.07704
+  return peak * Math.pow(flux, 0.25)
+}
+
 /** 적도면 원형 광자 궤도 반지름 — 순행(co-rotating) / 역행(counter-rotating) */
 export function photonOrbitRadii(a: number): [number, number] {
   const s = Math.abs(a)

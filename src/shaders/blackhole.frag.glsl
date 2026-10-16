@@ -29,6 +29,8 @@ uniform float uA;              // 광선 계량의 스핀
 uniform float uSpin;           // 원반 가스 궤도용 스핀
 uniform float uHorizon;        // r₊
 uniform float uDiskInner;      // 원반 안쪽 경계 (ISCO 이상, 잘린 원반이면 더 바깥)
+uniform float uIsco;           // 최내각 안정 궤도
+uniform float uFlow;           // 두꺼운 고온 가스층 밝기 (0 = 없음)
 uniform float uDiskOuter;
 uniform float uDiskThickness;  // H / r
 uniform float uDiskTemp;       // 원반 최고 온도 (K)
@@ -53,6 +55,8 @@ const float POLAR_S2    = 1e-6;      // 전환점이 자전축에서 sin θ < 0.
 const float DISK_GAIN   = 1.6;
 const float OPACITY     = 1.3;
 const float HAZE        = 0.05;
+const float FLOW_GAIN   = 2.2;
+const float FLOW_THETA  = 0.42;      // 고온 가스층의 각 두께 (H/r ≈ 0.4)
 
 // 광선마다 보존되는 양
 float gLq;    // L = q_φ  (E = q_t = 1 로 정규화)
@@ -188,6 +192,43 @@ void diskCrossing(vec3 P, vec3 dir, float footprint, inout vec3 col, inout float
   trans *= att;
 }
 
+// ── 두꺼운 고온 가스층 (광학적으로 얇은 토러스) ───────────────────────────
+// 전파 망원경 관측 모델(RIAF)처럼 지평선까지 이어지는 뜨겁고 두꺼운 가스. 원반면 밖에서도
+// 빛을 내므로, 옆에서 보면 그림자 앞을 덮어 "꽉 찬" 모습이 됩니다.
+// 가스 회전은 지평선 근처의 틀 끌림 각속도에서 ISCO 바깥의 케플러 각속도로 이어집니다.
+float flowRedshift(float rr) {
+  float a2 = uA * uA;
+  float delta = rr * rr - 2.0 * uM * rr + a2;
+  float A = (rr * rr + a2) * (rr * rr + a2) - a2 * delta;
+  float dragging = 2.0 * uM * uA * rr / A;
+  float kepler = 1.0 / (rr * sqrt(rr) + uSpin);
+  float omega = mix(dragging, kepler, smoothstep(uHorizon, max(uIsco, uHorizon + 0.1), rr));
+  float gtt = -(1.0 - 2.0 * uM / rr);
+  float gtp = -2.0 * uM * uA / rr;
+  float gpp = rr * rr + a2 + 2.0 * uM * a2 / rr;
+  float ut = inversesqrt(max(-(gtt + 2.0 * omega * gtp + omega * omega * gpp), 1e-3));
+  float g = gEloc / (ut * max(1.0 + omega * gLq, 0.05));
+  return pow(max(g, 0.005), uBeaming);
+}
+
+void flowEmission(float rm, float cm, float phm, float segLen, float footprint, inout vec3 col, inout float trans) {
+  float vert = exp(-cm * cm / (2.0 * FLOW_THETA * FLOW_THETA));
+  float radial = pow(uHorizon / rm, 1.5)
+               * smoothstep(uHorizon * 1.01, uHorizon * 1.3, rm)
+               * (1.0 - smoothstep(uDiskOuter * 0.35, uDiskOuter * 0.9, rm));
+  float dens = vert * radial;
+  if (dens < 2e-3) return;
+
+  vec3 m = diskField(rm, phm + cm * 1.7, footprint);
+  float turb = smoothstep(0.2, 0.85, m.r) * (0.45 + m.g);
+  float g = flowRedshift(rm);
+  float heat = 1.15 * (0.9 + 0.2 * m.b);
+  vec3 color = mix(blackbody(uDiskTemp * heat * g), indigoPalette(heat * g), uPalette);
+  float j = uFlow * FLOW_GAIN * dens * (0.3 + turb) * g * g * g;
+  col += trans * color * j * segLen;
+  trans *= exp(-0.08 * uFlow * dens * segLen);
+}
+
 // ── 공전하는 작은 행성 ─────────────────────────────────────────────────────
 vec3 shadePlanet(vec3 hit, vec3 rd) {
   vec3 n = normalize(hit - uPlanetPos);
@@ -228,8 +269,9 @@ void main() {
   gQ = dth * dth + c0 * c0 * (gLq * gLq / max(s0 * s0, 1e-6) - a2);
   gK = (gLq + uA) * (gLq + uA) + gQ;
   // θ 전환점 sin²θ_min ≈ L² / (Q + a² + L²). 축에 아주 가까이 스치는 광선은 축을 지나는 극한으로.
+  // 카메라가 자전축 가까이 있으면 L이 원래 작으므로, 문턱을 카메라의 축 거리(sin²θ₀)에 비례시킵니다.
   float sMin2 = gLq * gLq / max(gQ + a2 + gLq * gLq, 1e-6);
-  gLqT = sMin2 < POLAR_S2 ? 0.0 : gLq;
+  gLqT = sMin2 < POLAR_S2 * min(1.0, s0 * s0) ? 0.0 : gLq;
 
   float rAcc, thAcc, phDot, phRate, s, c;
   geodesicForces(r, th, rAcc, thAcc, phDot, phRate, s, c);
@@ -245,13 +287,15 @@ void main() {
   for (int i = 0; i < MAX_STEPS; i++) {
     if (i >= uSteps) break;
 
-    // 공간 이동량 ≈ k·r (시공간이 거의 평평한 먼 곳에서는 최대 3배), 방위각 변화 ≤ 0.1 rad.
-    // 자전축 근처에서 되튕기는 광선은 축까지 남은 각거리의 1/4 이상 한 번에 다가가지 않게 해
-    // 축을 도는 급격한 방위각 회전을 놓치지 않습니다.
+    // 공간 이동량 ≈ k·r (시공간이 거의 평평한 먼 곳에서는 최대 3배), 방위각 변화 ≤ 0.05 rad.
+    // 자전축까지 남은 각거리의 1/4 이상 한 번에 다가가지 않게 해 축을 도는 급격한 방위각 회전을
+    // 놓치지 않습니다. 축을 그대로 지나는 광선은 sin θ = 0.02 를 바닥으로 삼아 멈추지 않게 하고,
+    // 축에서 먼 곳에서는 두 종류의 광선이 같은 규칙을 따라 이웃 픽셀 사이에 이음매가 생기지 않습니다.
     float speed = sqrt(dr * dr + r * r * (dth * dth + s * s * phRate * phRate));
     float k = uStepScale * clamp(r * 0.125, 1.0, 3.0);
-    float h = min(k * r / max(speed, 1e-6), 0.1 / max(abs(phRate), 1e-6));
-    if (gLqT != 0.0) h = min(h, 0.25 * abs(s) / max(abs(dth), 1e-6));
+    float h = min(k * r / max(speed, 1e-6), 0.05 / max(abs(phRate), 1e-6));
+    float axisRoom = gLqT != 0.0 ? abs(s) : max(abs(s), 0.02);
+    h = min(h, 0.25 * axisRoom / max(abs(dth), 1e-6));
 
     float r1  = r  + dr  * h + 0.5 * rAcc  * h * h;
     float th1 = th + dth * h + 0.5 * thAcc * h * h;
@@ -259,7 +303,13 @@ void main() {
     geodesicForces(r1, th1, rAcc1, thAcc1, phDot1, phRate1, s1, c1);
     float dr1  = dr  + 0.5 * (rAcc  + rAcc1)  * h;
     float dth1 = dth + 0.5 * (thAcc + thAcc1) * h;
-    float ph1  = ph  + 0.5 * (phDot + phDot1) * h;
+    // 방위각: 축 근처에서 급변하는 L/sin²θ 항은 심프슨 공식, 나머지(틀 끌림)는 사다리꼴로 적분
+    float thMid = th + dth * h * 0.5 + thAcc * h * h * 0.125;
+    float sMid = sin(thMid);
+    float swing0 = phRate - uA;
+    float swing1 = phRate1 - uA;
+    float swingMid = gLqT / max(sMid * sMid, 1e-12);
+    float ph1 = ph + h * ((swing0 + 4.0 * swingMid + swing1) / 6.0 + 0.5 * ((phDot - swing0) + (phDot1 - swing1)));
 
     // 투영: 속도 크기를 정확한 불변량 |r'| = √R(r), |θ'| = √Θ(θ) 로 되돌립니다.
     // (미노 시간에서는 먼 곳의 작은 상대 오차가 블랙홀 근처에서 치명적으로 커지기 때문)
@@ -293,6 +343,11 @@ void main() {
           hitPlanet = true;
         }
       }
+    }
+
+    // 두꺼운 고온 가스층: 스텝 중간점에서 방출을 적분
+    if (uFlow > 0.001 && min(r, r1) < uDiskOuter) {
+      flowEmission(0.5 * (r + r1), 0.5 * (c + c1), 0.5 * (ph + ph1), segLen, uPixelAngle * (pathLen + 0.5 * segLen), col, trans);
     }
 
     // 원반: 적도면(y = 0) 통과 지점에서 샘플링, 스치기만 하면 두께만큼 옅은 광채

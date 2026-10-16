@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import common from '../shaders/common.glsl?raw'
 import vertexShader from '../shaders/blackhole.vert.glsl?raw'
 import fragmentShader from '../shaders/blackhole.frag.glsl?raw'
-import { blBasis, cartesianToBL, diskInnerRadius, horizonRadius, zamo } from '../lib/kerr'
+import { blBasis, cartesianToBL, diskInnerRadius, horizonRadius, iscoRadius, zamo } from '../lib/kerr'
 import { activeQuality } from '../lib/quality'
 import { physics, setUi, telemetry } from '../state/store'
 import { bakeDiskTexture, bakeSkyCube } from './generatedTextures'
@@ -52,6 +52,8 @@ export function BlackHole({ skySize }: { skySize: number }) {
           uSpin: { value: 0.6 },
           uHorizon: { value: 1.8 },
           uDiskInner: { value: 3.8 },
+          uIsco: { value: 3.8 },
+          uFlow: { value: 0 },
           uPalette: { value: 0 },
           uDiskOuter: { value: 26 },
           uDiskThickness: { value: 0.018 },
@@ -75,7 +77,7 @@ export function BlackHole({ skySize }: { skySize: number }) {
   material.uniforms.uDiskTex.value = textures.disk.texture
   material.uniforms.uSkyTex.value = textures.sky.texture
 
-  const scratch = useMemo(() => ({ bl: new THREE.Vector3() }), [])
+  const scratch = useMemo(() => ({ bl: new THREE.Vector3(), eye: new THREE.Vector3() }), [])
   const diskTime = useRef(0)
   const frames = useRef(0)
 
@@ -92,7 +94,10 @@ export function BlackHole({ skySize }: { skySize: number }) {
     const spin = physics.spin
     const m = physics.lensing
     const a = spin * m
-    const bl = cartesianToBL(camera.position, a, scratch.bl)
+    // 카메라가 원반면(y = 0) 위에 정확히 놓이면 첫 스텝이 원반 통과로 잡히므로 살짝 띄웁니다.
+    const eye = scratch.eye.copy(camera.position)
+    if (Math.abs(eye.y) < 0.02) eye.y = eye.y < 0 ? -0.02 : 0.02
+    const bl = cartesianToBL(eye, a, scratch.bl)
     const frame = zamo(bl.x, bl.y, a, m)
     blBasis(bl.x, bl.y, bl.z, a, u.uCamBasis.value)
     u.uCamBL.value.copy(bl)
@@ -103,6 +108,8 @@ export function BlackHole({ skySize }: { skySize: number }) {
     u.uHorizon.value = horizonRadius(spin)
     // 안쪽 경계: ISCO에서 바깥 반지름까지 (형태 변형 재생 시 gsap이 physics.inner를 오갑니다)
     u.uDiskInner.value = diskInnerRadius(spin, physics.outer, physics.inner)
+    u.uIsco.value = iscoRadius(spin)
+    u.uFlow.value = physics.flow
     u.uPalette.value = physics.palette
 
     u.uCamWorld.value.copy(camera.matrixWorld)
@@ -127,8 +134,7 @@ export function BlackHole({ skySize }: { skySize: number }) {
       PLANET_ORBIT * Math.sin(angle) * Math.cos(PLANET_INCLINATION),
     )
 
-    // HUD: 카메라(ZAMO)의 시간 지연 1/α — 렌즈 토글과 무관하게 실제 시공간 기준
-    telemetry.dilation = 1 / zamo(bl.x, bl.y, spin, 1).alpha
+    telemetry.planet.copy(u.uPlanetPos.value)
 
     // 첫 프레임에서 셰이더 컴파일이 끝난 뒤 인트로 연출을 시작합니다.
     if (++frames.current === 3) setUi({ ready: true })

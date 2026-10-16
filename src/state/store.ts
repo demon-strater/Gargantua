@@ -1,43 +1,53 @@
 import { useSyncExternalStore } from 'react'
 import gsap from 'gsap'
+import * as THREE from 'three'
 
 /*
- * 매 프레임 바뀌는 값(카메라, 포인터, 셰이더 파라미터)은 React state가 아닌
- * 가변 객체로 두고 gsap이 직접 트윈합니다. 리렌더 없이 useFrame에서 읽기만 합니다.
+ * 매 프레임 바뀌는 값(카메라, 입력, 셰이더 파라미터)은 React state가 아닌
+ * 가변 객체로 두고 gsap이 직접 트윈합니다. 리렌더 없이 useFrame/rAF에서 읽기만 합니다.
  * 길이 단위는 모두 블랙홀 질량 M (GM/c²) 입니다.
  */
-
-/** 스크롤 타임라인이 조종하는 카메라 궤도 파라미터 */
-export const rig = {
-  distance: 54, // 블랙홀 중심까지의 거리 (M)
-  elevation: 0, // 관측 경사각에 더해지는 고도 오프셋 (rad)
-  azimuth: 0, // 공전 방위각 (rad)
-  fov: 40,
-  roll: 0,
-}
 
 /** 첫 진입 시 멀리서 날아 들어오는 연출 (1 → 0) */
 export const intro = { k: 1 }
 
-/** gsap.quickTo로 부드럽게 따라가는 정규화된 포인터 위치 (-1 ~ 1) */
-export const pointer = { x: 0, y: 0 }
+/** 자유 비행 카메라 상태 (마인크래프트 크리에이티브 모드식: 요·피치 + 수평 이동 + 상승/하강) */
+export const flight = {
+  position: new THREE.Vector3(0, 54 * Math.sin(0.105), 54 * Math.cos(0.105)),
+  velocity: new THREE.Vector3(),
+  yaw: 0, // 0 = -Z 방향(블랙홀 쪽)을 봄
+  pitch: -0.105,
+  engaged: false, // 비행 조작 활성 (인트로가 끝나고 클릭한 뒤)
+  autopilot: false, // 프리셋 시점으로 이동 중
+}
 
-/** HUD가 읽어 가는 계측값 */
-export const telemetry = { distance: 54, dilation: 1 }
+/** HUD와 구조 팝업이 읽어 가는 계측값 (실제 스핀 기준 BL 좌표) */
+export const telemetry = {
+  r: 54,
+  theta: Math.PI / 2,
+  alpha: 1, // ZAMO 시간 지연 dτ/dt
+  omega: 0, // 틀 끌림 각속도
+  varpi: 54, // 원통 반지름
+  speed: 0, // 비행 속도 (M/s)
+  planet: new THREE.Vector3(),
+}
 
 /* ── 물리 파라미터 ───────────────────────────────────────────────────────── */
 
+export type MorphMode = 'spin' | 'inner'
+
 export type PhysicsParams = {
   spin: number // a/M (음수 = 원반이 블랙홀 자전과 반대로 공전)
-  inclination: number // 원반 평면 기준 관측 고도 (°)
   beaming: number // 도플러 빔 + 중력 적색편이 세기 (0 = 영화 연출, 1 = 실제 물리)
   thickness: number // 원반 두께 H/r
   temperature: number // 원반 최고 온도 (K)
   outer: number // 원반 바깥 반지름 (M)
   inner: number // 원반 안쪽 경계: 0 = ISCO, 1 = 바깥 반지름 (잘린 원반)
+  flow: number // 두꺼운 고온 가스층 밝기 (0 = 없음)
   roll: number // 화면 회전 (°) — 90°면 원반이 세로로 섭니다
   indigo: boolean // 흑체 색 대신 인디고 색감
-  morph: boolean // 안쪽 경계를 자동으로 오가며 형태 변형 재생
+  morph: boolean // 형태 변형 자동 재생
+  morphMode: MorphMode // 'spin' = 스핀만 오감, 'inner' = 안쪽 경계만 오감
   exposure: number
   lensing: boolean
   massLog: number // log10(M / M☉) — 모양은 바꾸지 않고 실제 크기만 정합니다
@@ -46,12 +56,12 @@ export type PhysicsParams = {
 /** 셰이더가 읽는 값. 슬라이더를 움직이면 gsap이 이 객체를 부드럽게 보간합니다. */
 export const physics = {
   spin: 0.6,
-  inclination: (6 * Math.PI) / 180,
   beaming: 1,
   thickness: 0.012,
   temperature: 5800,
   outer: 26,
   inner: 0,
+  flow: 0,
   roll: 0,
   palette: 0,
   exposure: 1,
@@ -60,42 +70,89 @@ export const physics = {
 }
 
 export function tweenPhysics(params: PhysicsParams, duration = 0.9) {
+  const spinMorph = params.morph && params.morphMode === 'spin'
+  const innerMorph = params.morph && params.morphMode === 'inner'
   gsap.to(physics, {
-    spin: params.spin,
-    inclination: (params.inclination * Math.PI) / 180,
     beaming: params.beaming,
     thickness: params.thickness,
     temperature: params.temperature,
     outer: params.outer,
+    flow: params.flow,
     roll: (params.roll * Math.PI) / 180,
     palette: params.indigo ? 1 : 0,
     exposure: params.exposure,
     lensing: params.lensing ? 1 : 0,
-    // 형태 변형 재생 중에는 안쪽 경계를 재생 타임라인이 맡습니다.
-    ...(params.morph ? {} : { inner: params.inner }),
+    // 형태 변형 재생 중에는 해당 값을 재생 타임라인이 맡습니다.
+    ...(spinMorph ? {} : { spin: params.spin }),
+    ...(innerMorph ? {} : { inner: params.inner }),
     duration,
     ease: 'power2.inOut',
     overwrite: 'auto',
   })
-  setMorph(params.morph)
+  setMorph(params.morph ? params.morphMode : null)
 }
 
 /*
- * 형태 변형: 원반 안쪽 경계를 ISCO에서 바깥 가장자리까지 오가게 합니다.
- * 꽉 찬 원반 → 가운데가 뚫린 도넛 → 렌즈된 바깥 가장자리만 남은 가는 고리 → 다시 원반.
+ * 형태 변형
+ *  - spin : 스핀 a/M 하나만 +0.998 ↔ −0.998 로 오갑니다. ISCO가 1.2 M ↔ 9 M 로 움직여
+ *           원반 크기가 고정이면 넓은 원반 → 도넛 → 가는 고리가 됩니다. (순수한 물리 값 변화)
+ *  - inner: 스핀은 두고 원반 안쪽 경계(잘린 원반)만 ISCO ↔ 바깥 가장자리로 오갑니다.
  */
 let morphTimeline: gsap.core.Timeline | null = null
+let morphMode: MorphMode | null = null
 
-// 재생을 멈추면 tweenPhysics가 안쪽 경계를 슬라이더 값으로 되돌립니다.
-function setMorph(on: boolean) {
-  if (on === Boolean(morphTimeline)) return
+function setMorph(mode: MorphMode | null) {
+  if (mode === morphMode) return
   morphTimeline?.kill()
-  morphTimeline = on
-    ? gsap
-        .timeline()
-        .to(physics, { inner: 0, duration: 1.2, ease: 'power2.inOut' })
-        .add(gsap.to(physics, { inner: 0.95, duration: 4.5, ease: 'sine.inOut', repeat: -1, yoyo: true, repeatDelay: 1.4 }))
-    : null
+  morphMode = mode
+  morphTimeline = null
+  if (mode === 'spin') {
+    morphTimeline = gsap
+      .timeline()
+      .to(physics, { spin: 0.998, inner: 0, duration: 1.2, ease: 'power2.inOut' })
+      .add(gsap.to(physics, { spin: -0.998, duration: 5, ease: 'sine.inOut', repeat: -1, yoyo: true, repeatDelay: 1.4 }))
+  } else if (mode === 'inner') {
+    morphTimeline = gsap
+      .timeline()
+      .to(physics, { inner: 0, duration: 1.2, ease: 'power2.inOut' })
+      .add(gsap.to(physics, { inner: 0.95, duration: 4.5, ease: 'sine.inOut', repeat: -1, yoyo: true, repeatDelay: 1.4 }))
+  }
+}
+
+/**
+ * 프리셋 시점으로 자동 비행: 원반 평면 기준 고도 inclination(°), 거리 distance(M)에서
+ * 블랙홀 중심을 바라보도록 부드럽게 이동합니다. 현재 방위각은 유지합니다.
+ */
+export function flyToView(inclinationDeg: number, distance: number, duration = 2.6) {
+  const p = flight.position
+  const azimuth = Math.atan2(p.x, p.z)
+  const elevation = THREE.MathUtils.degToRad(Math.max(inclinationDeg, 0.25))
+  const target = new THREE.Vector3(
+    distance * Math.cos(elevation) * Math.sin(azimuth),
+    distance * Math.sin(elevation),
+    distance * Math.cos(elevation) * Math.cos(azimuth),
+  )
+  // 도착 지점에서 중심을 바라보는 요/피치 (요 0 = -Z 방향, 피치 음수 = 아래)
+  const yaw = Math.atan2(target.x, target.z)
+  const pitch = -elevation
+  // 요는 가까운 쪽으로 돌도록 2π 범위를 맞춥니다.
+  const startYaw = flight.yaw
+  const dyaw = Math.atan2(Math.sin(yaw - startYaw), Math.cos(yaw - startYaw))
+
+  flight.autopilot = true
+  flight.velocity.set(0, 0, 0)
+  gsap.killTweensOf(flight.position)
+  gsap.killTweensOf(flight)
+  gsap.to(flight.position, { x: target.x, y: target.y, z: target.z, duration, ease: 'power3.inOut' })
+  gsap.to(flight, {
+    yaw: startYaw + dyaw,
+    pitch,
+    duration,
+    ease: 'power3.inOut',
+    onComplete: () => {
+      flight.autopilot = false
+    },
+  })
 }
 
 export type QualityTier = 'low' | 'medium' | 'high'
@@ -109,6 +166,9 @@ export type UiState = {
   params: PhysicsParams
   preset: string | null
   panelOpen: boolean
+  engaged: boolean // 비행 시작 여부 (첫 클릭 이후)
+  pointerLocked: boolean
+  helpOpen: boolean
 }
 
 let ui: UiState = {
@@ -117,21 +177,25 @@ let ui: UiState = {
   dpr: 1,
   params: {
     spin: 0.6,
-    inclination: 6,
     beaming: 1,
     thickness: 0.012,
     temperature: 5800,
     outer: 26,
     inner: 0,
+    flow: 0,
     roll: 0,
     indigo: false,
     morph: false,
+    morphMode: 'spin',
     exposure: 1,
     lensing: true,
     massLog: 8,
   },
   preset: 'physical',
   panelOpen: false,
+  engaged: false,
+  pointerLocked: false,
+  helpOpen: true,
 }
 const listeners = new Set<() => void>()
 
