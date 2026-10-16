@@ -19,11 +19,11 @@ export function Experience({ device }: { device: DeviceInfo }) {
       flat
       dpr={initialDpr}
       gl={{ antialias: false, alpha: false, stencil: false, powerPreference: 'high-performance' }}
-      camera={{ fov: 40, near: 0.1, far: 600, position: [0, 6, 80] }}
+      camera={{ fov: 40, near: 0.1, far: 1200, position: [0, 12, 146] }}
     >
       <AdaptiveQuality device={device} />
       <CameraRig reducedMotion={device.reducedMotion} />
-      <BlackHole />
+      <BlackHole skySize={device.skySize} />
       <StarDust />
       <Effects />
     </Canvas>

@@ -18,12 +18,12 @@ const vertexShader = /* glsl */ `
 
     // 블랙홀보다 앞쪽에 있는 먼지만 보이게 합니다 (뒤쪽 빛은 셰이더가 렌즈로 처리).
     float front = 1.0 - smoothstep(uHoleDepth * 0.5, uHoleDepth * 0.85, depth);
-    float near = smoothstep(0.8, 4.0, depth);
+    float near = smoothstep(1.6, 8.0, depth);
     float twinkle = 0.55 + 0.45 * sin(uTime * (0.4 + aSeed * 1.6) + aSeed * 61.0);
     vAlpha = twinkle * front * near * (0.2 + 0.8 * fract(aSeed * 7.13));
     vColor = mix(vec3(1.0, 0.80, 0.60), vec3(0.62, 0.74, 1.0), fract(aSeed * 3.71));
 
-    float size = (0.6 + fract(aSeed * 11.3)) * 26.0 / max(depth, 0.5);
+    float size = (0.6 + fract(aSeed * 11.3)) * 52.0 / max(depth, 1.0);
     gl_PointSize = clamp(size, 1.0, 7.0) * uPixelRatio;
     vAlpha *= clamp(size, 0.0, 1.0);
   }
@@ -50,8 +50,8 @@ export function StarDust() {
     const seeds = new Float32Array(MAX_DUST)
     const v = new THREE.Vector3()
     for (let i = 0; i < MAX_DUST; i++) {
-      // 반지름 16~120 사이 껍질에 부피 균일 분포, 원반 평면 쪽에 살짝 몰리게
-      const r = Math.cbrt(THREE.MathUtils.lerp(16 ** 3, 120 ** 3, Math.random()))
+      // 반지름 32~240 M 껍질에 부피 균일 분포, 원반 평면 쪽에 살짝 몰리게
+      const r = Math.cbrt(THREE.MathUtils.lerp(32 ** 3, 240 ** 3, Math.random()))
       v.randomDirection()
       v.y *= 0.55
       v.normalize().multiplyScalar(r)
@@ -72,7 +72,7 @@ export function StarDust() {
         transparent: true,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
-        uniforms: { uTime: { value: 0 }, uPixelRatio: { value: 1 }, uHoleDepth: { value: 34 } },
+        uniforms: { uTime: { value: 0 }, uPixelRatio: { value: 1 }, uHoleDepth: { value: 54 } },
       }),
     [],
   )
