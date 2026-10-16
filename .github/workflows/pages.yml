@@ -1,4 +1,4 @@
-name: Publish lab
+name: Publish site
 on:
   push:
     branches: [main]
@@ -21,10 +21,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+      - run: npm ci
       - run: node scripts/catalog.mjs
+      - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: public
+          path: dist
       - uses: actions/deploy-pages@v4
         id: deployment

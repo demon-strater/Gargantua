@@ -1,0 +1,436 @@
+:root {
+  --ink: #f3ede3;
+  --ink-dim: rgba(243, 237, 227, 0.68);
+  --ink-faint: rgba(243, 237, 227, 0.38);
+  --line: rgba(243, 237, 227, 0.16);
+  --accent: #ffc98f;
+  --serif: 'Cormorant Garamond', 'Noto Serif KR', Georgia, serif;
+  --sans: 'Inter', 'Noto Sans KR', system-ui, -apple-system, sans-serif;
+  --kr: 'Noto Sans KR', 'Inter', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --gutter: clamp(16px, 4vw, 56px);
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: #000;
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: rgba(255, 201, 143, 0.3);
+}
+
+/* ── 3D 무대: 고정된 배경, 터치/휠은 문서 스크롤로 통과 ───────────────── */
+.stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.stage canvas {
+  display: block;
+}
+
+.overlay {
+  position: relative;
+  z-index: 1;
+}
+
+/* 인트로 전에는 숨겨 두고 gsap이 autoAlpha로 드러냅니다 */
+.chrome,
+.controls,
+.scroll-hint__inner,
+.hero__eyebrow,
+.quote__word,
+.quote__cite,
+[data-reveal] {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* ── 로딩 베일 ───────────────────────────────────────────────────────────── */
+.veil {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: #000;
+  pointer-events: none;
+}
+
+.veil__text {
+  font: 300 10px/1 var(--mono);
+  letter-spacing: 0.5em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  animation: breathe 2.6s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* ── 상단 크롬: 브랜드 + 계측 HUD ───────────────────────────────────────── */
+.chrome {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 20;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  padding: calc(var(--gutter) * 0.7) var(--gutter);
+  pointer-events: none;
+}
+
+.brand {
+  display: grid;
+  gap: 8px;
+}
+
+.brand__mark {
+  font: 400 13px/1 var(--sans);
+  letter-spacing: 0.62em;
+  text-transform: uppercase;
+}
+
+.brand__sub,
+.hud dt {
+  font: 300 9.5px/1 var(--mono);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.hud {
+  display: flex;
+  gap: clamp(16px, 3vw, 40px);
+  margin: 0;
+  text-align: right;
+}
+
+.hud div {
+  display: grid;
+  gap: 8px;
+}
+
+.hud dt {
+  white-space: nowrap;
+}
+
+.hud dd {
+  margin: 0;
+  font: 400 12px/1 var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud__render dd {
+  text-transform: uppercase;
+}
+
+/* ── 히어로: 칼 세이건 인용 ─────────────────────────────────────────────── */
+.journey {
+  position: relative;
+}
+
+.hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100svh;
+  padding: 0 var(--gutter) clamp(72px, 11vh, 140px);
+}
+
+.hero__inner {
+  display: grid;
+  justify-items: center;
+  gap: 22px;
+  text-align: center;
+}
+
+.hero__eyebrow,
+.chapter__index {
+  margin: 0;
+  font: 300 10px/1 var(--mono);
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.quote {
+  margin: 0;
+  max-width: 24em;
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 300;
+  font-size: clamp(27px, 3.1vw, 54px);
+  line-height: 1.1;
+  letter-spacing: -0.005em;
+  text-shadow: 0 0 40px rgba(0, 0, 0, 0.7);
+}
+
+.quote p {
+  margin: 0;
+}
+
+.quote__word {
+  display: inline-block;
+  white-space: pre;
+}
+
+.quote__cite {
+  margin-top: 26px;
+  font: 300 11px/1 var(--sans);
+  font-style: normal;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  text-shadow: none;
+}
+
+/* ── 챕터 ───────────────────────────────────────────────────────────────── */
+.chapter {
+  display: flex;
+  align-items: center;
+  min-height: 100vh;
+  min-height: 100svh;
+  padding: 0 var(--gutter);
+}
+
+.chapter__card {
+  position: relative;
+  max-width: 410px;
+  padding: 28px 0;
+}
+
+/* 원반이 밝은 구간에서도 읽히도록 카드 뒤에 부드러운 어둠을 깔아 줍니다 */
+.chapter__card::before {
+  content: '';
+  position: absolute;
+  inset: -35% -45%;
+  z-index: -1;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0.4) 60%, transparent);
+  pointer-events: none;
+}
+
+.chapter__index {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.chapter__index span {
+  width: 48px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+.chapter__title {
+  margin: 20px 0 0;
+  font: 300 clamp(34px, 3.6vw, 52px) / 1.02 var(--serif);
+  letter-spacing: -0.01em;
+}
+
+.chapter__lead {
+  margin: 14px 0 0;
+  font: 400 clamp(16px, 1.4vw, 19px) / 1.5 var(--kr);
+  color: var(--ink);
+}
+
+.chapter__body {
+  margin: 14px 0 0;
+  font: 300 14.5px/1.85 var(--kr);
+  color: rgba(243, 237, 227, 0.82);
+  word-break: keep-all;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.8);
+}
+
+.chapter__data {
+  margin: 22px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font: 300 10.5px/1.4 var(--mono);
+  letter-spacing: 0.16em;
+  color: var(--ink-dim);
+}
+
+/* ── 스크롤 안내 ────────────────────────────────────────────────────────── */
+.scroll-hint {
+  position: fixed;
+  left: var(--gutter);
+  bottom: calc(var(--gutter) * 0.6);
+  z-index: 20;
+  pointer-events: none;
+}
+
+.scroll-hint__inner {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  gap: 14px;
+  font: 300 9.5px/1 var(--mono);
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.scroll-hint i {
+  position: relative;
+  width: 1px;
+  height: 42px;
+  overflow: hidden;
+  background: var(--line);
+}
+
+.scroll-hint i::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--ink);
+  transform: translateY(-100%);
+  animation: fall 2.4s cubic-bezier(0.7, 0, 0.3, 1) infinite;
+}
+
+@keyframes fall {
+  60%,
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+/* ── 물리 토글 ──────────────────────────────────────────────────────────── */
+.controls {
+  position: fixed;
+  right: var(--gutter);
+  bottom: calc(var(--gutter) * 0.6);
+  z-index: 20;
+  display: flex;
+  gap: 8px;
+}
+
+.controls button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: var(--ink-dim);
+  font: 300 9.5px/1 var(--mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.4s, border-color 0.4s, background 0.4s;
+}
+
+.controls button:hover {
+  color: var(--ink);
+  border-color: rgba(243, 237, 227, 0.35);
+}
+
+.controls button:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.controls i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  transition: background 0.4s, box-shadow 0.4s;
+}
+
+.controls button[aria-pressed='true'] {
+  color: var(--ink);
+}
+
+.controls button[aria-pressed='true'] i {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+}
+
+/* ── 모바일 ─────────────────────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .hud {
+    gap: 14px;
+  }
+
+  .hud .hud__render {
+    display: none;
+  }
+
+  .brand__sub {
+    display: none;
+  }
+
+  .hero {
+    padding-bottom: 20vh;
+  }
+
+  .quote {
+    max-width: 13em;
+  }
+
+  .chapter {
+    align-items: flex-end;
+    padding-bottom: 18vh;
+  }
+
+  .chapter__card {
+    max-width: none;
+  }
+
+  .controls {
+    left: var(--gutter);
+    right: var(--gutter);
+    justify-content: center;
+  }
+
+  .controls button {
+    padding: 8px 11px;
+    font-size: 8.5px;
+    letter-spacing: 0.12em;
+  }
+
+  .scroll-hint {
+    left: 50%;
+    bottom: 76px;
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .veil__text,
+  .scroll-hint i::after {
+    animation: none;
+  }
+}
