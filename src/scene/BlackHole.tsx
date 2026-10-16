@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import common from '../shaders/common.glsl?raw'
 import vertexShader from '../shaders/blackhole.vert.glsl?raw'
 import fragmentShader from '../shaders/blackhole.frag.glsl?raw'
-import { blBasis, cartesianToBL, horizonRadius, iscoRadius, zamo } from '../lib/kerr'
+import { blBasis, cartesianToBL, diskInnerRadius, horizonRadius, zamo } from '../lib/kerr'
 import { activeQuality } from '../lib/quality'
 import { physics, setUi, telemetry } from '../state/store'
 import { bakeDiskTexture, bakeSkyCube } from './generatedTextures'
@@ -51,7 +51,8 @@ export function BlackHole({ skySize }: { skySize: number }) {
           uA: { value: 0.6 },
           uSpin: { value: 0.6 },
           uHorizon: { value: 1.8 },
-          uIsco: { value: 3.8 },
+          uDiskInner: { value: 3.8 },
+          uPalette: { value: 0 },
           uDiskOuter: { value: 26 },
           uDiskThickness: { value: 0.018 },
           uDiskTemp: { value: 5800 },
@@ -100,7 +101,9 @@ export function BlackHole({ skySize }: { skySize: number }) {
     u.uA.value = a
     u.uSpin.value = spin
     u.uHorizon.value = horizonRadius(spin)
-    u.uIsco.value = iscoRadius(spin)
+    // 안쪽 경계: ISCO에서 바깥 반지름까지 (형태 변형 재생 시 gsap이 physics.inner를 오갑니다)
+    u.uDiskInner.value = diskInnerRadius(spin, physics.outer, physics.inner)
+    u.uPalette.value = physics.palette
 
     u.uCamWorld.value.copy(camera.matrixWorld)
     u.uProjInv.value.copy(camera.projectionMatrixInverse)

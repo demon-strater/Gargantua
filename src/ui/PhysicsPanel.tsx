@@ -3,6 +3,7 @@ import {
   AU_KM,
   SOLAR_GRAVITATIONAL_RADIUS_KM,
   circularOrbitTimeDilation,
+  diskInnerRadius,
   horizonRadius,
   iscoRadius,
   photonOrbitRadii,
@@ -10,7 +11,7 @@ import {
 import { PRESETS } from '../lib/presets'
 import { getUi, setUi, tweenPhysics, useUi, type PhysicsParams } from '../state/store'
 
-type NumericKey = Exclude<keyof PhysicsParams, 'lensing'>
+type NumericKey = Exclude<keyof PhysicsParams, 'lensing' | 'indigo' | 'morph'>
 
 type SliderSpec = {
   key: NumericKey
@@ -18,7 +19,7 @@ type SliderSpec = {
   min: number
   max: number
   step: number
-  format: (value: number) => string
+  format: (value: number, params: PhysicsParams) => string
   hint: string
 }
 
@@ -35,7 +36,7 @@ const SLIDERS: SliderSpec[] = [
   {
     key: 'inclination',
     label: '관측 경사',
-    min: 1,
+    min: 0,
     max: 80,
     step: 0.5,
     format: (v) => `${v.toFixed(1)}°`,
@@ -76,6 +77,24 @@ const SLIDERS: SliderSpec[] = [
     step: 0.5,
     format: (v) => `${v.toFixed(1)} M`,
     hint: '원반 바깥 반지름',
+  },
+  {
+    key: 'inner',
+    label: '원반 안쪽 경계',
+    min: 0,
+    max: 0.95,
+    step: 0.005,
+    format: (v, p) => (v < 0.003 ? 'ISCO' : `${diskInnerRadius(p.spin, p.outer, v).toFixed(1)} M`),
+    hint: '원반이 ISCO보다 바깥에서 잘린 경우. 넓힐수록 도넛 → 가는 고리가 됩니다',
+  },
+  {
+    key: 'roll',
+    label: '화면 회전',
+    min: -90,
+    max: 90,
+    step: 1,
+    format: (v) => `${Math.round(v)}°`,
+    hint: '90°면 원반이 세로로 섭니다',
   },
   {
     key: 'exposure',
@@ -132,6 +151,17 @@ export function PhysicsPanel() {
         </div>
         <p className="panel__note">{activePreset ? activePreset.note : '사용자 설정'}</p>
 
+        <button
+          type="button"
+          className="panel__morph"
+          aria-pressed={params.morph}
+          onClick={() => update({ morph: !params.morph })}
+        >
+          <i aria-hidden="true" />
+          {params.morph ? '형태 변형 멈추기' : '형태 변형 재생'}
+          <span>원반 안쪽 경계를 자동으로 오갑니다</span>
+        </button>
+
         <div className="panel__sliders">
           {SLIDERS.map((spec) => (
             <label key={spec.key} className="slider">
@@ -142,10 +172,11 @@ export function PhysicsPanel() {
                   )}
                   {spec.label}
                 </span>
-                <output className="slider__value">{spec.format(params[spec.key])}</output>
+                <output className="slider__value">{spec.format(params[spec.key], params)}</output>
               </span>
               <input
                 type="range"
+                disabled={spec.key === 'inner' && params.morph}
                 min={spec.min}
                 max={spec.max}
                 step={spec.step}
@@ -155,6 +186,19 @@ export function PhysicsPanel() {
               <span className="slider__hint">{spec.hint}</span>
             </label>
           ))}
+
+          <label className="switch">
+            <span>
+              <span className="slider__label">인디고 색감</span>
+              <span className="slider__hint">흑체 색 대신 푸른 보랏빛으로 칠합니다 (연출용)</span>
+            </span>
+            <input
+              type="checkbox"
+              role="switch"
+              checked={params.indigo}
+              onChange={(event) => update({ indigo: event.currentTarget.checked })}
+            />
+          </label>
 
           <label className="switch">
             <span>

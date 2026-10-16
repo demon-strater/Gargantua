@@ -469,6 +469,62 @@ body {
   word-break: keep-all;
 }
 
+.panel__morph {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 4px;
+  width: 100%;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(243, 237, 227, 0.04);
+  color: var(--ink);
+  font: 400 13px/1.2 var(--kr);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.3s, background 0.3s;
+}
+
+.panel__morph span {
+  grid-column: 2;
+  font: 300 11px/1.4 var(--kr);
+  color: var(--ink-faint);
+}
+
+.panel__morph i {
+  grid-row: span 2;
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 10px solid var(--accent);
+}
+
+.panel__morph[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: rgba(255, 201, 143, 0.1);
+}
+
+.panel__morph[aria-pressed='true'] i {
+  width: 10px;
+  height: 12px;
+  border: 0;
+  border-left: 3px solid var(--accent);
+  border-right: 3px solid var(--accent);
+}
+
+.panel__morph:hover {
+  border-color: rgba(243, 237, 227, 0.35);
+}
+
+.slider input[type='range']:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .panel__sliders {
   display: grid;
   gap: 16px;

@@ -28,10 +28,11 @@ uniform float uM;              // 광선 계량의 질량 (렌즈 토글 시 0�
 uniform float uA;              // 광선 계량의 스핀
 uniform float uSpin;           // 원반 가스 궤도용 스핀
 uniform float uHorizon;        // r₊
-uniform float uIsco;           // 원반 안쪽 경계
+uniform float uDiskInner;      // 원반 안쪽 경계 (ISCO 이상, 잘린 원반이면 더 바깥)
 uniform float uDiskOuter;
 uniform float uDiskThickness;  // H / r
 uniform float uDiskTemp;       // 원반 최고 온도 (K)
+uniform float uPalette;        // 0 = 흑체 색, 1 = 인디고 색감
 uniform float uBeaming;        // 0 = 영화처럼 g 효과 없음, 1 = 실제 물리
 uniform float uExposure;
 uniform float uPixelAngle;
@@ -129,15 +130,28 @@ float redshift(float rr) {
 
 // 노비코프–손 형태의 복사 플럭스 F ∝ r⁻³ (1 − √(r_in / r)), 최댓값 1로 정규화
 float diskFlux(float rr) {
-  float x = rr / uIsco;
+  float x = rr / uDiskInner;
   return max((1.0 - 0.95 * inversesqrt(max(x, 0.5))) / (x * x * x), 0.0) / FLUX_PEAK;
+}
+
+// 인디고 색감: 상대 온도(T·g / T_max)를 짙은 남색 → 푸른 보라 → 흰빛 → 뜨거운 금빛으로
+vec3 indigoPalette(float heat) {
+  vec3 col = mix(vec3(0.07, 0.05, 0.42), vec3(0.32, 0.34, 1.0), smoothstep(0.35, 0.95, heat));
+  col = mix(col, vec3(0.9, 0.92, 1.0), smoothstep(0.95, 1.25, heat));
+  return mix(col, vec3(1.0, 0.72, 0.42), smoothstep(1.2, 1.6, heat));
 }
 
 // 진동수 이동은 색온도로(T ∝ F^¼ · g), 밝기는 I_ν/ν³ 불변량에 따라 g³ 으로
 vec3 diskSource(float rr, float g, float heat, float brightness) {
   float flux = diskFlux(rr);
   float temp = uDiskTemp * pow(flux, 0.25) * heat;
-  return blackbody(temp * g) * (pow(flux, 0.55) * brightness * g * g * g * DISK_GAIN);
+  vec3 color = mix(blackbody(temp * g), indigoPalette(pow(flux, 0.25) * heat * g), uPalette);
+  return color * (pow(flux, 0.55) * brightness * g * g * g * DISK_GAIN);
+}
+
+// 바깥 가장자리 감쇠: 잘린 원반이 가는 고리가 되어도 밝기가 남도록 고리 폭에 비례
+float outerFade(float rr) {
+  return 1.0 - smoothstep(uDiskOuter - 0.55 * (uDiskOuter - uDiskInner), uDiskOuter, rr);
 }
 
 // 케플러 차등 회전으로 흐르는 원반 텍스처 (반 주기 어긋난 두 위상을 교차 페이드)
@@ -158,12 +172,11 @@ vec3 diskField(float rr, float phi, float footprint) {
 // 광선이 원반면을 지나는 지점: 슬랩을 비스듬히 지날수록 광학 깊이가 커집니다.
 void diskCrossing(vec3 P, vec3 dir, float footprint, inout vec3 col, inout float trans) {
   float rr = sqrt(max(P.x * P.x + P.z * P.z - uA * uA, 1e-6));
-  if (rr < uIsco * 0.8 || rr > uDiskOuter) return;
+  if (rr < uDiskInner * 0.8 || rr > uDiskOuter) return;
 
   vec3 m = diskField(rr, atan(P.z, P.x), footprint);
-  float inner = smoothstep(uIsco * 0.8, uIsco * 1.1, rr);
-  float outer = 1.0 - smoothstep(uDiskOuter * 0.45, uDiskOuter, rr);
-  float dens = smoothstep(0.26, 0.82, m.r) * (0.3 + 1.2 * m.g) * (0.55 + 0.9 * m.b) * inner * outer;
+  float inner = smoothstep(uDiskInner * 0.8, uDiskInner * 1.1, rr);
+  float dens = smoothstep(0.26, 0.82, m.r) * (0.3 + 1.2 * m.g) * (0.55 + 0.9 * m.b) * inner * outerFade(rr);
 
   float cosI = max(abs(dir.y), uDiskThickness * 1.5);
   float tau = OPACITY * dens / cosI;
@@ -285,7 +298,7 @@ void main() {
     // 원반: 적도면(y = 0) 통과 지점에서 샘플링, 스치기만 하면 두께만큼 옅은 광채
     float y0 = r * c;
     float y1 = r1 * c1;
-    bool inDiskRange = min(r, r1) < uDiskOuter * 1.02 && max(r, r1) > uIsco * 0.75;
+    bool inDiskRange = min(r, r1) < uDiskOuter * 1.02 && max(r, r1) > uDiskInner * 0.75;
     if (inDiskRange && y0 * y1 <= 0.0 && y0 != y1) {
       if (!haveCartesian) {
         P0 = blToCartesian(r, th, ph);
@@ -300,9 +313,8 @@ void main() {
       float rm = 0.5 * (r + r1);
       float H = uDiskThickness * rm;
       float yMin = min(abs(y0), abs(y1));
-      if (yMin < 2.5 * H && rm > uIsco && rm < uDiskOuter) {
-        float outer = 1.0 - smoothstep(uDiskOuter * 0.45, uDiskOuter, rm);
-        float w = exp(-yMin * yMin / (H * H)) * min(segLen / H, 4.0) * outer * HAZE;
+      if (yMin < 2.5 * H && rm > uDiskInner && rm < uDiskOuter) {
+        float w = exp(-yMin * yMin / (H * H)) * min(segLen / H, 4.0) * outerFade(rm) * HAZE;
         col += trans * diskSource(rm, redshift(rm), 1.0, 0.6) * w;
       }
     }

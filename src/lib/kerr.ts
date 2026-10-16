@@ -24,6 +24,12 @@ export function iscoRadius(a: number) {
   return 3 + z2 - Math.sign(a) * Math.sqrt((3 - z1) * (3 + z1 + 2 * z2))
 }
 
+/** 잘린 원반의 안쪽 경계: fraction 0 = ISCO, 1 = 바깥 반지름 */
+export function diskInnerRadius(a: number, outer: number, fraction: number) {
+  const isco = iscoRadius(a)
+  return isco + (Math.max(outer, isco + 1) - isco) * fraction
+}
+
 /** 적도면 원형 광자 궤도 반지름 — 순행(co-rotating) / 역행(counter-rotating) */
 export function photonOrbitRadii(a: number): [number, number] {
   const s = Math.abs(a)

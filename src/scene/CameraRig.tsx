@@ -15,14 +15,10 @@ export function CameraRig({ reducedMotion }: { reducedMotion: boolean }) {
     const drift = reducedMotion ? 0 : state.clock.elapsedTime * 0.012
     const parallax = reducedMotion ? 0.4 : 1
 
-    // 카메라가 원반 매질 안으로 들어가지 않도록 최소 고도를 둡니다.
-    const clearance = Math.atan(3 * physics.thickness) + 0.015
     const azimuth = rig.azimuth + drift + pointer.x * 0.32 * parallax
-    const elevation = THREE.MathUtils.clamp(
-      physics.inclination + rig.elevation - pointer.y * 0.08 * parallax,
-      clearance,
-      1.45,
-    )
+    // 원반 아래로도 내려갈 수 있지만, 원반면(y = 0) 바로 위에는 놓이지 않게 합니다.
+    let elevation = THREE.MathUtils.clamp(physics.inclination + rig.elevation - pointer.y * 0.08 * parallax, -1.45, 1.45)
+    if (Math.abs(elevation) < 0.004) elevation = elevation < 0 ? -0.004 : 0.004
     const distance = rig.distance + intro.k * 92
 
     camera.position.set(
@@ -36,7 +32,7 @@ export function CameraRig({ reducedMotion }: { reducedMotion: boolean }) {
     target.y = -pointer.y * 0.5 * parallax
     camera.up.set(0, 1, 0)
     camera.lookAt(target)
-    camera.rotateZ(rig.roll - pointer.x * 0.015 * parallax)
+    camera.rotateZ(rig.roll + physics.roll - pointer.x * 0.015 * parallax)
 
     if (camera.fov !== rig.fov) {
       camera.fov = rig.fov

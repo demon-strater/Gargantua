@@ -34,6 +34,10 @@ export type PhysicsParams = {
   thickness: number // 원반 두께 H/r
   temperature: number // 원반 최고 온도 (K)
   outer: number // 원반 바깥 반지름 (M)
+  inner: number // 원반 안쪽 경계: 0 = ISCO, 1 = 바깥 반지름 (잘린 원반)
+  roll: number // 화면 회전 (°) — 90°면 원반이 세로로 섭니다
+  indigo: boolean // 흑체 색 대신 인디고 색감
+  morph: boolean // 안쪽 경계를 자동으로 오가며 형태 변형 재생
   exposure: number
   lensing: boolean
   massLog: number // log10(M / M☉) — 모양은 바꾸지 않고 실제 크기만 정합니다
@@ -47,6 +51,9 @@ export const physics = {
   thickness: 0.012,
   temperature: 5800,
   outer: 26,
+  inner: 0,
+  roll: 0,
+  palette: 0,
   exposure: 1,
   lensing: 1,
   fade: 0, // 인트로 노출 페이드
@@ -60,12 +67,35 @@ export function tweenPhysics(params: PhysicsParams, duration = 0.9) {
     thickness: params.thickness,
     temperature: params.temperature,
     outer: params.outer,
+    roll: (params.roll * Math.PI) / 180,
+    palette: params.indigo ? 1 : 0,
     exposure: params.exposure,
     lensing: params.lensing ? 1 : 0,
+    // 형태 변형 재생 중에는 안쪽 경계를 재생 타임라인이 맡습니다.
+    ...(params.morph ? {} : { inner: params.inner }),
     duration,
     ease: 'power2.inOut',
     overwrite: 'auto',
   })
+  setMorph(params.morph)
+}
+
+/*
+ * 형태 변형: 원반 안쪽 경계를 ISCO에서 바깥 가장자리까지 오가게 합니다.
+ * 꽉 찬 원반 → 가운데가 뚫린 도넛 → 렌즈된 바깥 가장자리만 남은 가는 고리 → 다시 원반.
+ */
+let morphTimeline: gsap.core.Timeline | null = null
+
+// 재생을 멈추면 tweenPhysics가 안쪽 경계를 슬라이더 값으로 되돌립니다.
+function setMorph(on: boolean) {
+  if (on === Boolean(morphTimeline)) return
+  morphTimeline?.kill()
+  morphTimeline = on
+    ? gsap
+        .timeline()
+        .to(physics, { inner: 0, duration: 1.2, ease: 'power2.inOut' })
+        .add(gsap.to(physics, { inner: 0.95, duration: 4.5, ease: 'sine.inOut', repeat: -1, yoyo: true, repeatDelay: 1.4 }))
+    : null
 }
 
 export type QualityTier = 'low' | 'medium' | 'high'
@@ -92,6 +122,10 @@ let ui: UiState = {
     thickness: 0.012,
     temperature: 5800,
     outer: 26,
+    inner: 0,
+    roll: 0,
+    indigo: false,
+    morph: false,
     exposure: 1,
     lensing: true,
     massLog: 8,
