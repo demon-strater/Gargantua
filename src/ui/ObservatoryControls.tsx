@@ -35,7 +35,6 @@ export function ObservatoryControls() {
   }, [notice])
 
   const selectView = (destination: typeof DESTINATIONS[number]) => {
-    if (document.pointerLockElement) document.exitPointerLock()
     setUi({ waypoint: destination.id, orbit: false, scanOpen: true })
     flight.fov = 48
     flyToView(destination.elevation, destination.radius())
@@ -49,7 +48,7 @@ export function ObservatoryControls() {
   ]
   return <>
     <div className="mode-switch" role="group" aria-label="관측 모드">
-      <button aria-pressed={!ui.engaged || ui.orbit} onClick={() => { flight.engaged = false; flight.velocity.set(0, 0, 0); setUi({ orbit: true, engaged: false }); if (document.pointerLockElement) document.exitPointerLock() }}><Icon name="orbit" />궤도 관찰</button>
+      <button aria-pressed={!ui.engaged || ui.orbit} onClick={() => { flight.engaged = false; flight.velocity.set(0, 0, 0); setUi({ orbit: true, engaged: false }) }}><Icon name="orbit" />궤도 관찰</button>
       <button aria-pressed={ui.engaged && !ui.orbit} onClick={startFlight}><Icon name="flight" />자유 비행</button>
     </div>
     <nav className="destinations" aria-label="관측 지점 이동">

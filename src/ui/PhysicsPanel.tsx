@@ -279,7 +279,7 @@ export function PhysicsPanel() {
         className="panel-toggle"
         aria-expanded={open}
         aria-controls="physics-panel"
-        onClick={() => { if (document.pointerLockElement) document.exitPointerLock(); setUi({ panelOpen: !open, helpOpen: false }) }}
+        onClick={() => setUi({ panelOpen: !open, helpOpen: false })}
       >
         <Icon name="sliders" /> <span>{open ? '물리 패널 닫기' : '물리 파라미터'}</span><kbd>P</kbd>
       </button>

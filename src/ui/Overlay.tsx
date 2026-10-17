@@ -14,7 +14,6 @@ export function Overlay({ device }: { device: DeviceInfo }) {
   const ready = useUi(s => s.ready)
   const engaged = useUi(s => s.engaged)
   const cinematic = useUi(s => s.cinematic)
-  const locked = useUi(s => s.pointerLocked)
   const touch = device.mobile || window.matchMedia('(pointer: coarse)').matches
 
   useLayoutEffect(() => {
@@ -67,7 +66,7 @@ export function Overlay({ device }: { device: DeviceInfo }) {
         <ControlsHelp />
         <PhysicsPanel />
         {touch && <TouchControls />}
-        {engaged && !locked && !touch && <div className="flight-hint">화면 클릭으로 시선 고정 <span>·</span> 드래그로 둘러보기 <span>·</span> <kbd>ESC</kbd> 해제</div>}
+        {engaged && !touch && <div className="flight-hint">드래그로 둘러보기 <span>·</span> <kbd>WASD</kbd> 이동 <span>·</span> <kbd>ESC</kbd> 패널 닫기</div>}
         <div className="frame-corner frame-corner--tl" /><div className="frame-corner frame-corner--tr" /><div className="frame-corner frame-corner--bl" /><div className="frame-corner frame-corner--br" />
       </div>
       {cinematic && <button className="cinema-exit" onClick={() => setUi({ cinematic: false })}><Icon name="grid" /> 관측 콘솔 표시 <kbd>V</kbd></button>}

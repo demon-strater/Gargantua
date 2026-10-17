@@ -131,8 +131,8 @@ const KEYS: [string[], string][] = [
   [['SPACE'], '상승'],
   [['SHIFT'], '하강'],
   [['CTRL'], '가속'],
-  [['MOUSE'], '시선'],
-  [['ESC'], '마우스 해제'],
+  [['DRAG'], '시선'],
+  [['ESC'], '패널 닫기'],
   [['P'], '물리 패널'],
   [['H'], '도움말'],
   [['WHEEL'], '시야각 확대 · 축소'],
@@ -183,11 +183,10 @@ export function ControlsHelp() {
   )
 }
 
-/** 비행 시작 안내 / 마우스 고정 안내 */
+/** 비행 시작 안내 / 시선 조작 안내 */
 export function EngagePrompt({ touch }: { touch: boolean }) {
   const ready = useUi((state) => state.ready)
   const engaged = useUi((state) => state.engaged)
-  const locked = useUi((state) => state.pointerLocked)
   const panelOpen = useUi((state) => state.panelOpen)
 
   if (!ready) return null
@@ -199,10 +198,10 @@ export function EngagePrompt({ touch }: { touch: boolean }) {
       </div>
     )
   }
-  if (!touch && !locked && !panelOpen) {
+  if (!touch && !panelOpen) {
     return (
       <div className="engage engage--hint" role="status">
-        <span className="engage__sub">클릭: 마우스 시점 고정 · 드래그: 시선 회전</span>
+        <span className="engage__sub">드래그: 시선 회전</span>
       </div>
     )
   }

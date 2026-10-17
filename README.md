@@ -16,8 +16,8 @@ node scripts/verify-physics.mjs
 
 ## 관측 방법
 
-- **자유 비행 시작**: 드래그로 시선 이동. 배경 클릭: 마우스 시선 고정. WASD 수평 이동, Space 상승, Shift 하강, Ctrl 가속.
-- **Esc**: 시선 고정 해제 및 열린 패널 닫기. 포인터 고정을 지원하지 않는 환경에서는 드래그로 시선을 돌립니다.
+- **자유 비행 시작** 또는 배경 클릭: 비행 시작. 마우스 드래그로 시선을 돌립니다(마우스 고정 없음). WASD 수평 이동, Space 상승, Shift 하강, Ctrl 가속.
+- **Esc**: 열린 패널 닫기.
 - **마우스 휠**: 시야각 24–85° 조절. **R**: 초기 관측 지점. **P**: 물리 패널. **H**: 조작 안내. **V**: 시네마틱 보기.
 - **궤도 관찰**: 중심을 바라보며 천천히 공전. **시간 정지**: 가스 흐름·행성·관측 공전 일시 정지.
 - **관측 지점**: 파노라마, 강착 원반, 광자 궤도, 사건의 지평선으로 이동합니다. 위치에 따라 스캔 패널이 자동으로 전환됩니다.
@@ -54,7 +54,7 @@ node scripts/verify-physics.mjs
 
 - `src/shaders/blackhole.frag.glsl`: Kerr 광선 추적, 원반·가스·행성·별.
 - `src/shaders/diskTexture.frag.glsl`: 시작 시 GPU에서 생성하는 난류 텍스처.
-- `src/scene/FlightRig.tsx`: 자유 비행, 포인터 고정, 궤도 관찰, 줌.
+- `src/scene/FlightRig.tsx`: 자유 비행, 드래그 시선, 궤도 관찰, 줌.
 - `src/scene/AdaptiveQuality.tsx`: FPS 기반 자동 품질 / ULTRA.
 - `src/scene/ObservationCapture.tsx`: 완료된 프레임 저장.
 - `src/ui/Overlay.tsx`, `ObservatoryControls.tsx`, `styles.css`: 관측 콘솔.

@@ -5,14 +5,13 @@ import { cartesianToBL, constrainFlightPosition, horizonRadius, zamo } from '../
 import { flight, getUi, goHome, intro, physics, setUi, telemetry } from '../state/store'
 import { touchInput } from '../ui/touchInput'
 
-const LOOK_SENSITIVITY = 0.0022
 const DRAG_SENSITIVITY = 0.0042
 const MAX_DISTANCE = 320
 const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight'])
 
 /**
  * 마인크래프트 크리에이티브 모드식 자유 비행.
- *  - 비행 버튼: 드래그로 시선. 화면 클릭: 마우스 고정(포인터 락) 후 마우스로 시선, ESC로 해제
+ *  - 드래그: 시선 회전 (포인터 락 없음), 짧은 클릭 또는 비행 버튼: 비행 시작
  *  - W/A/S/D: 바라보는 방향 기준 수평 이동, Space/Shift: 상승/하강, Ctrl: 가속
  *  - 속도는 블랙홀까지의 거리에 비례해 자동으로 줄어들고, 사건의 지평선 바로 바깥에서 멈춥니다.
  */
@@ -37,18 +36,9 @@ export function FlightRig() {
       setUi({ engaged: true, orbit: false, panelOpen: false, helpOpen: false })
       flight.engaged = true
     }
+    // 포인터 락은 쓰지 않습니다 (브라우저의 'Esc를 누르세요' 안내가 뜨지 않도록). 시선은 드래그로 돌립니다.
     // 버튼에 포커스가 남으면 이동 키가 무시되므로 포커스를 풉니다.
-    const releaseFocus = () => (document.activeElement as HTMLElement | null)?.blur?.()
-    const lock = () => {
-      if (window.matchMedia('(pointer: coarse)').matches) return
-      releaseFocus()
-      try {
-        const request = canvas.requestPointerLock?.() as unknown as Promise<void> | undefined
-        request?.catch?.(() => {})
-      } catch { /* Drag-to-look remains available in browsers without pointer lock. */ }
-    }
-    // UI 버튼은 포인터 락을 요청하지 않습니다 (브라우저의 'Esc를 누르세요' 안내가 뜨지 않도록). 시선은 드래그로 돌립니다.
-    const engageFromUi = () => { engage(); releaseFocus() }
+    const engageFromUi = () => { engage(); (document.activeElement as HTMLElement | null)?.blur?.() }
 
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null
@@ -63,13 +53,11 @@ export function FlightRig() {
       if (event.code === 'KeyR') { goHome(); return }
       if (event.code === 'KeyP') {
         setUi({ panelOpen: !getUi().panelOpen })
-        if (document.pointerLockElement) document.exitPointerLock()
         return
       }
       if (event.code === 'KeyH') {
         setUi({ helpOpen: !getUi().helpOpen })
         keys.current.clear()
-        if (document.pointerLockElement) document.exitPointerLock()
         return
       }
       if (!MOVE_KEYS.has(event.code)) return
@@ -86,17 +74,9 @@ export function FlightRig() {
       flight.fov = THREE.MathUtils.clamp(flight.fov + event.deltaY * 0.025, 24, 85)
     }
 
-    const onMouseMove = (event: MouseEvent) => {
-      if (document.pointerLockElement !== canvas || flight.autopilot) return
-      flight.yaw -= event.movementX * LOOK_SENSITIVITY
-      flight.pitch = THREE.MathUtils.clamp(flight.pitch - event.movementY * LOOK_SENSITIVITY, -1.55, 1.55)
-    }
-    const onLockChange = () => { keys.current.clear(); setUi({ pointerLocked: document.pointerLockElement === canvas }) }
-
-    // 포인터 락이 없을 때(또는 터치)는 드래그로 시선을 돌립니다. 짧은 클릭은 비행 시작/마우스 고정.
+    // 마우스·터치 모두 드래그로 시선을 돌립니다. 짧은 클릭은 비행 시작.
     let drag: { id: number; x: number; y: number; moved: number } | null = null
     const onPointerDown = (event: PointerEvent) => {
-      if (document.pointerLockElement === canvas) return
       drag = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: 0 }
       canvas.setPointerCapture(event.pointerId)
     }
@@ -117,9 +97,7 @@ export function FlightRig() {
       const click = drag.moved < 6
       drag = null
       if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId)
-      if (!click) return
-      engage()
-      lock()
+      if (click) engageFromUi()
     }
     const onPointerCancel = () => { drag = null }
 
@@ -127,8 +105,6 @@ export function FlightRig() {
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
     window.addEventListener('blur', onBlur)
-    document.addEventListener('mousemove', onMouseMove)
-    document.addEventListener('pointerlockchange', onLockChange)
     document.addEventListener('visibilitychange', onVisibility)
     canvas.addEventListener('wheel', onWheel, { passive: false })
     canvas.addEventListener('pointerdown', onPointerDown)
@@ -140,8 +116,6 @@ export function FlightRig() {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
       window.removeEventListener('blur', onBlur)
-      document.removeEventListener('mousemove', onMouseMove)
-      document.removeEventListener('pointerlockchange', onLockChange)
       document.removeEventListener('visibilitychange', onVisibility)
       canvas.removeEventListener('wheel', onWheel)
       canvas.removeEventListener('pointerdown', onPointerDown)

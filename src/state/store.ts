@@ -178,7 +178,6 @@ export type UiState = {
   preset: string | null
   panelOpen: boolean
   engaged: boolean // 비행 시작 여부 (첫 클릭 이후)
-  pointerLocked: boolean
   helpOpen: boolean
   scanOpen: boolean
   cinematic: boolean
@@ -211,7 +210,6 @@ let ui: UiState = {
   preset: 'physical',
   panelOpen: false,
   engaged: false,
-  pointerLocked: false,
   helpOpen: false,
   scanOpen: true,
   cinematic: false,
