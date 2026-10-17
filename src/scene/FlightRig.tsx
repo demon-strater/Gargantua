@@ -12,7 +12,7 @@ const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft',
 
 /**
  * 마인크래프트 크리에이티브 모드식 자유 비행.
- *  - 클릭: 마우스 고정(포인터 락) 후 마우스로 시선, ESC로 해제 (해제 상태에서는 드래그로 시선)
+ *  - 비행 버튼: 드래그로 시선. 화면 클릭: 마우스 고정(포인터 락) 후 마우스로 시선, ESC로 해제
  *  - W/A/S/D: 바라보는 방향 기준 수평 이동, Space/Shift: 상승/하강, Ctrl: 가속
  *  - 속도는 블랙홀까지의 거리에 비례해 자동으로 줄어들고, 사건의 지평선 바로 바깥에서 멈춥니다.
  */
@@ -37,15 +37,18 @@ export function FlightRig() {
       setUi({ engaged: true, orbit: false, panelOpen: false, helpOpen: false })
       flight.engaged = true
     }
+    // 버튼에 포커스가 남으면 이동 키가 무시되므로 포커스를 풉니다.
+    const releaseFocus = () => (document.activeElement as HTMLElement | null)?.blur?.()
     const lock = () => {
       if (window.matchMedia('(pointer: coarse)').matches) return
-      ;(document.activeElement as HTMLElement | null)?.blur?.()
+      releaseFocus()
       try {
         const request = canvas.requestPointerLock?.() as unknown as Promise<void> | undefined
         request?.catch?.(() => {})
       } catch { /* Drag-to-look remains available in browsers without pointer lock. */ }
     }
-    const engageFromUi = () => { engage(); lock() }
+    // UI 버튼은 포인터 락을 요청하지 않습니다 (브라우저의 'Esc를 누르세요' 안내가 뜨지 않도록). 시선은 드래그로 돌립니다.
+    const engageFromUi = () => { engage(); releaseFocus() }
 
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null
