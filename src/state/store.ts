@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import gsap from 'gsap'
 import * as THREE from 'three'
+import { blToCartesian, horizonRadius } from '../lib/kerr'
 
 /*
  * 매 프레임 바뀌는 값(카메라, 입력, 셰이더 파라미터)은 React state가 아닌
@@ -13,10 +14,11 @@ export const intro = { k: 1 }
 
 /** 자유 비행 카메라 상태 (마인크래프트 크리에이티브 모드식: 요·피치 + 수평 이동 + 상승/하강) */
 export const flight = {
-  position: new THREE.Vector3(0, 54 * Math.sin(0.105), 54 * Math.cos(0.105)),
+  position: new THREE.Vector3(0, 38 * Math.sin(0.075), 38 * Math.cos(0.075)),
   velocity: new THREE.Vector3(),
   yaw: 0, // 0 = -Z 방향(블랙홀 쪽)을 봄
-  pitch: -0.105,
+  pitch: -0.075,
+  fov: 48,
   engaged: false, // 비행 조작 활성 (인트로가 끝나고 클릭한 뒤)
   autopilot: false, // 프리셋 시점으로 이동 중
 }
@@ -29,6 +31,7 @@ export const telemetry = {
   omega: 0, // 틀 끌림 각속도
   varpi: 54, // 원통 반지름
   speed: 0, // 비행 속도 (M/s)
+  fps: 0,
   planet: new THREE.Vector3(),
 }
 
@@ -58,11 +61,11 @@ export const physics = {
   spin: 0.6,
   beaming: 1,
   thickness: 0.012,
-  temperature: 5800,
+  temperature: 6800,
   outer: 26,
   inner: 0,
   flow: 0,
-  roll: 0,
+  roll: -0.07,
   palette: 0,
   exposure: 1,
   lensing: 1,
@@ -126,15 +129,13 @@ function setMorph(mode: MorphMode | null) {
 export function flyToView(inclinationDeg: number, distance: number, duration = 2.6) {
   const p = flight.position
   const azimuth = Math.atan2(p.x, p.z)
-  const elevation = THREE.MathUtils.degToRad(Math.max(inclinationDeg, 0.25))
-  const target = new THREE.Vector3(
-    distance * Math.cos(elevation) * Math.sin(azimuth),
-    distance * Math.sin(elevation),
-    distance * Math.cos(elevation) * Math.cos(azimuth),
-  )
+  const elevation = THREE.MathUtils.degToRad(THREE.MathUtils.clamp(inclinationDeg, -89, 89))
+  distance = Math.max(distance, horizonRadius(physics.spin) + 0.14)
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) duration = 0
+  const target = blToCartesian(distance, Math.PI / 2 - elevation, Math.PI / 2 - azimuth, physics.spin, new THREE.Vector3())
   // 도착 지점에서 중심을 바라보는 요/피치 (요 0 = -Z 방향, 피치 음수 = 아래)
   const yaw = Math.atan2(target.x, target.z)
-  const pitch = -elevation
+  const pitch = -Math.atan2(target.y, Math.hypot(target.x, target.z))
   // 요는 가까운 쪽으로 돌도록 2π 범위를 맞춥니다.
   const startYaw = flight.yaw
   const dyaw = Math.atan2(Math.sin(yaw - startYaw), Math.cos(yaw - startYaw))
@@ -157,6 +158,16 @@ export function flyToView(inclinationDeg: number, distance: number, duration = 2
 
 export type QualityTier = 'low' | 'medium' | 'high'
 
+export function startFlight() {
+  window.dispatchEvent(new Event('gargantua:engage'))
+}
+
+export function goHome() {
+  flight.fov = 48
+  setUi({ orbit: false, waypoint: 'overview' })
+  flyToView(4.3, 38)
+}
+
 /* ── UI가 구독하는 작은 반응형 스토어 ───────────────────────────────────── */
 
 export type UiState = {
@@ -169,6 +180,12 @@ export type UiState = {
   engaged: boolean // 비행 시작 여부 (첫 클릭 이후)
   pointerLocked: boolean
   helpOpen: boolean
+  scanOpen: boolean
+  cinematic: boolean
+  orbit: boolean
+  paused: boolean
+  qualityMode: 'auto' | 'high'
+  waypoint: string | null
 }
 
 let ui: UiState = {
@@ -179,11 +196,11 @@ let ui: UiState = {
     spin: 0.6,
     beaming: 1,
     thickness: 0.012,
-    temperature: 5800,
+    temperature: 6800,
     outer: 26,
     inner: 0,
     flow: 0,
-    roll: 0,
+    roll: -4,
     indigo: false,
     morph: false,
     morphMode: 'spin',
@@ -195,7 +212,13 @@ let ui: UiState = {
   panelOpen: false,
   engaged: false,
   pointerLocked: false,
-  helpOpen: true,
+  helpOpen: false,
+  scanOpen: true,
+  cinematic: false,
+  orbit: false,
+  paused: false,
+  qualityMode: 'auto',
+  waypoint: 'overview',
 }
 const listeners = new Set<() => void>()
 
@@ -203,6 +226,7 @@ export function setUi(patch: Partial<UiState>) {
   const next = { ...ui, ...patch }
   if ((Object.keys(patch) as (keyof UiState)[]).every((key) => next[key] === ui[key])) return
   ui = next
+  if (patch.paused !== undefined) morphTimeline?.paused(patch.paused)
   listeners.forEach((listener) => listener())
 }
 

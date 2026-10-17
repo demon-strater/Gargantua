@@ -6,7 +6,7 @@ import vertexShader from '../shaders/blackhole.vert.glsl?raw'
 import fragmentShader from '../shaders/blackhole.frag.glsl?raw'
 import { blBasis, cartesianToBL, diskInnerRadius, horizonRadius, iscoRadius, zamo } from '../lib/kerr'
 import { activeQuality } from '../lib/quality'
-import { physics, setUi, telemetry } from '../state/store'
+import { getUi, physics, setUi, telemetry } from '../state/store'
 import { bakeDiskTexture, bakeSkyCube } from './generatedTextures'
 
 /** 원반 시간 배율 — 1초에 3 M 의 좌표 시간이 흐릅니다. */
@@ -23,7 +23,7 @@ const PLANET_RADIUS = 0.3
 export function BlackHole({ skySize }: { skySize: number }) {
   const gl = useThree((state) => state.gl)
 
-  const textures = useMemo(() => ({ disk: bakeDiskTexture(gl), sky: bakeSkyCube(gl, skySize) }), [gl, skySize])
+  const textures = useMemo(() => ({ disk: bakeDiskTexture(gl, skySize < 768 ? 2048 : 4096), sky: bakeSkyCube(gl, skySize) }), [gl, skySize])
   useEffect(
     () => () => {
       textures.disk.dispose()
@@ -80,15 +80,22 @@ export function BlackHole({ skySize }: { skySize: number }) {
   const scratch = useMemo(() => ({ bl: new THREE.Vector3(), eye: new THREE.Vector3() }), [])
   const diskTime = useRef(0)
   const frames = useRef(0)
+  const frameTime = useRef({ sum: 0, count: 0 })
 
   useFrame((state, delta) => {
     const u = material.uniforms
     const camera = state.camera as THREE.PerspectiveCamera
     const profile = activeQuality.profile
 
-    diskTime.current += Math.min(delta, 0.1) * DISK_SPEED
-    u.uTime.value = state.clock.elapsedTime
+    if (!getUi().paused) diskTime.current += Math.min(delta, 0.1) * DISK_SPEED
+    u.uTime.value = diskTime.current / DISK_SPEED
     u.uDiskTime.value = diskTime.current
+    frameTime.current.sum += delta
+    frameTime.current.count++
+    if (frameTime.current.sum >= .6) {
+      telemetry.fps = frameTime.current.count / frameTime.current.sum
+      frameTime.current = { sum: 0, count: 0 }
+    }
 
     // 렌즈 효과를 끄면 광선이 지나는 시공간의 M, a를 0으로 보내 평평하게 만듭니다.
     const spin = physics.spin

@@ -9,8 +9,9 @@ import skyFragment from '../shaders/sky.frag.glsl?raw'
  * 강착 원반 텍스처 (2048×1024, φ 방향 반복, 밉맵).
  * 매 프레임 노이즈를 계산하는 대신 한 번 구워 두고 체적 샘플링에서 읽기만 합니다.
  */
-export function bakeDiskTexture(gl: THREE.WebGLRenderer) {
-  const target = new THREE.WebGLRenderTarget(2048, 1024, {
+export function bakeDiskTexture(gl: THREE.WebGLRenderer, requestedSize = 4096) {
+  const size = Math.min(requestedSize, gl.capabilities.maxTextureSize)
+  const target = new THREE.WebGLRenderTarget(size, size / 2, {
     type: THREE.UnsignedByteType,
     wrapS: THREE.RepeatWrapping,
     wrapT: THREE.ClampToEdgeWrapping,

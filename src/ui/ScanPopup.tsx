@@ -1,16 +1,18 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
-import { flight, getUi, useUi } from '../state/store'
+import { flight, getUi, setUi, useUi } from '../state/store'
+import { Icon } from './Icon'
 import { ZONES, buildContext, detectZone, type Context, type Zone, type ZoneId } from './zones'
 
 /** 비행 위치를 감시해 가까워진 구조의 스캔 팝업을 띄웁니다. */
 export function ScanPopup({ reducedMotion }: { reducedMotion: boolean }) {
-  const engaged = useUi((state) => state.engaged)
+  const ready = useUi((state) => state.ready)
+  const open = useUi((state) => state.scanOpen)
   const [zoneId, setZoneId] = useState<ZoneId | null>(null)
   const [context, setContext] = useState<Context | null>(null)
 
   useEffect(() => {
-    if (!engaged) return
+    if (!ready) return
     let current: ZoneId | null = null
     const tick = () => {
       const ctx = buildContext(getUi().params)
@@ -24,10 +26,10 @@ export function ScanPopup({ reducedMotion }: { reducedMotion: boolean }) {
     tick()
     const timer = window.setInterval(tick, 200)
     return () => window.clearInterval(timer)
-  }, [engaged])
+  }, [ready])
 
   const zone = ZONES.find((item) => item.id === zoneId)
-  if (!engaged || !zone || !context) return null
+  if (!ready || !open || !zone || !context) return null
   return <ScanCard key={zone.id} zone={zone} context={context} reducedMotion={reducedMotion} />
 }
 
@@ -42,7 +44,7 @@ function ScanCard({ zone, context, reducedMotion }: { zone: Zone; context: Conte
       gsap
         .timeline()
         .fromTo('.scan__frame', { clipPath: 'inset(0 0 100% 0)' }, { clipPath: 'inset(0 0 0% 0)', duration: 0.55, ease: 'steps(9)' })
-        .to('.scan__frame', { keyframes: { x: [-10, 6, -4, 3, -1, 0] }, duration: 0.36, ease: 'none' }, 0)
+        .fromTo('.scan__frame', { x: 12 }, { x: 0, duration: 0.55, ease: 'power3.out' }, 0)
         .fromTo('.scan__frame', { opacity: 0.2 }, { opacity: 1, duration: 0.3, ease: 'steps(5)' }, 0)
         .fromTo('[data-row]', { autoAlpha: 0, x: -8 }, { autoAlpha: 1, x: 0, duration: 0.3, stagger: 0.06 }, 0.35)
     }, root)
@@ -51,19 +53,20 @@ function ScanCard({ zone, context, reducedMotion }: { zone: Zone; context: Conte
 
   const rows = zone.rows(context)
   return (
-    <aside ref={root} className="scan" data-accent={zone.accent} aria-live="polite">
+    <aside ref={root} className="scan" data-accent={zone.accent} aria-label="현재 영역 구조 스캔">
       <div className="scan__frame">
         <div className="scan__inner">
           <header className="scan__bar">
-            <span>{zone.code}</span>
-            <span className="scan__rec">● LIVE</span>
+            <span><Icon name="target" /> STRUCTURE SCANNER</span>
+            <button aria-label="구조 스캔 닫기" onClick={() => setUi({ scanOpen: false })}><Icon name="close" /></button>
           </header>
           <div className="scan__body">
-            <p className="scan__en">{titleEn}</p>
-            <h3 className="scan__title">{zone.title}</h3>
+            <div className="scan__visual"><StructureMap zone={zone.id} context={context} /><div className="scan__signal"><span className="scan__rec"><i /> LIVE SCAN</span><strong>{context.r.toFixed(2)}<small> R / M</small></strong><span>TARGET ACQUIRED</span></div></div>
+            <p className="scan__code">{zone.code}</p>
+            <p className="scan__en" aria-hidden="true">{titleEn}</p>
+            <h3 className="scan__title" aria-live="polite">{zone.title}</h3>
             <p className="scan__desc">{zone.description}</p>
             <div className="scan__grid">
-              <StructureMap zone={zone.id} context={context} />
               <dl className="scan__rows">
                 {rows.map(([label, value]) => (
                   <div key={label} data-row>
@@ -75,7 +78,7 @@ function ScanCard({ zone, context, reducedMotion }: { zone: Zone; context: Conte
             </div>
           </div>
           <footer className="scan__foot">
-            <span>R {context.r.toFixed(2)} M</span>
+            <span><i className="status-dot" /> AUTO DETECT</span>
             <span>θ {((context.theta * 180) / Math.PI).toFixed(1)}°</span>
             <span>a {context.a.toFixed(3)}</span>
           </footer>

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { cartesianToBL, horizonRadius, zamo } from '../lib/kerr'
-import { flight, getUi, intro, physics, setUi, telemetry } from '../state/store'
+import { cartesianToBL, constrainFlightPosition, horizonRadius, zamo } from '../lib/kerr'
+import { flight, getUi, goHome, intro, physics, setUi, telemetry } from '../state/store'
 import { touchInput } from '../ui/touchInput'
 
 const LOOK_SENSITIVITY = 0.0022
@@ -26,7 +26,7 @@ export function FlightRig() {
   )
 
   useEffect(() => {
-    camera.fov = 55
+    camera.fov = flight.fov
     camera.near = 0.05
     camera.updateProjectionMatrix()
   }, [camera])
@@ -34,17 +34,30 @@ export function FlightRig() {
   useEffect(() => {
     const engage = () => {
       if (!getUi().ready) return
-      if (!getUi().engaged) setUi({ engaged: true })
+      setUi({ engaged: true, orbit: false, panelOpen: false, helpOpen: false })
       flight.engaged = true
     }
     const lock = () => {
       if (window.matchMedia('(pointer: coarse)').matches) return
       ;(document.activeElement as HTMLElement | null)?.blur?.()
-      const request = canvas.requestPointerLock() as unknown as Promise<void> | undefined
-      request?.catch?.(() => {})
+      try {
+        const request = canvas.requestPointerLock?.() as unknown as Promise<void> | undefined
+        request?.catch?.(() => {})
+      } catch { /* Drag-to-look remains available in browsers without pointer lock. */ }
     }
+    const engageFromUi = () => { engage(); lock() }
 
     const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (target?.matches('input, textarea, select, [contenteditable="true"]')) return
+      if (event.code === 'Escape') {
+        setUi({ cinematic: false, helpOpen: false, panelOpen: false })
+        keys.current.clear()
+        return
+      }
+      if (event.repeat && ['KeyP', 'KeyH', 'KeyV', 'KeyR'].includes(event.code)) return
+      if (event.code === 'KeyV') { setUi({ cinematic: !getUi().cinematic }); return }
+      if (event.code === 'KeyR') { goHome(); return }
       if (event.code === 'KeyP') {
         setUi({ panelOpen: !getUi().panelOpen })
         if (document.pointerLockElement) document.exitPointerLock()
@@ -52,22 +65,30 @@ export function FlightRig() {
       }
       if (event.code === 'KeyH') {
         setUi({ helpOpen: !getUi().helpOpen })
+        keys.current.clear()
+        if (document.pointerLockElement) document.exitPointerLock()
         return
       }
       if (!MOVE_KEYS.has(event.code)) return
+      if (getUi().panelOpen || getUi().helpOpen || target?.closest('button')) return
       // 포커스된 버튼이 Space로 눌리거나 페이지가 움직이지 않게 합니다.
       if (getUi().engaged) event.preventDefault()
       keys.current.add(event.code)
     }
     const onKeyUp = (event: KeyboardEvent) => keys.current.delete(event.code)
-    const onBlur = () => keys.current.clear()
+    const onBlur = () => { keys.current.clear(); touchInput.x = 0; touchInput.y = 0; touchInput.lift = 0; touchInput.boost = false }
+    const onVisibility = () => { if (document.hidden) onBlur() }
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      flight.fov = THREE.MathUtils.clamp(flight.fov + event.deltaY * 0.025, 24, 85)
+    }
 
     const onMouseMove = (event: MouseEvent) => {
       if (document.pointerLockElement !== canvas || flight.autopilot) return
       flight.yaw -= event.movementX * LOOK_SENSITIVITY
       flight.pitch = THREE.MathUtils.clamp(flight.pitch - event.movementY * LOOK_SENSITIVITY, -1.55, 1.55)
     }
-    const onLockChange = () => setUi({ pointerLocked: document.pointerLockElement === canvas })
+    const onLockChange = () => { keys.current.clear(); setUi({ pointerLocked: document.pointerLockElement === canvas }) }
 
     // 포인터 락이 없을 때(또는 터치)는 드래그로 시선을 돌립니다. 짧은 클릭은 비행 시작/마우스 고정.
     let drag: { id: number; x: number; y: number; moved: number } | null = null
@@ -83,7 +104,8 @@ export function FlightRig() {
       drag.x = event.clientX
       drag.y = event.clientY
       drag.moved += Math.abs(dx) + Math.abs(dy)
-      if (!getUi().engaged || flight.autopilot) return
+      if (flight.autopilot) return
+      if (getUi().orbit) setUi({ orbit: false })
       flight.yaw += dx * DRAG_SENSITIVITY
       flight.pitch = THREE.MathUtils.clamp(flight.pitch + dy * DRAG_SENSITIVITY, -1.55, 1.55)
     }
@@ -91,30 +113,38 @@ export function FlightRig() {
       if (!drag || drag.id !== event.pointerId) return
       const click = drag.moved < 6
       drag = null
+      if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId)
       if (!click) return
       engage()
       lock()
     }
+    const onPointerCancel = () => { drag = null }
 
+    window.addEventListener('gargantua:engage', engageFromUi)
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
     window.addEventListener('blur', onBlur)
     document.addEventListener('mousemove', onMouseMove)
     document.addEventListener('pointerlockchange', onLockChange)
+    document.addEventListener('visibilitychange', onVisibility)
+    canvas.addEventListener('wheel', onWheel, { passive: false })
     canvas.addEventListener('pointerdown', onPointerDown)
     canvas.addEventListener('pointermove', onPointerMove)
     canvas.addEventListener('pointerup', onPointerUp)
-    canvas.addEventListener('pointercancel', onPointerUp)
+    canvas.addEventListener('pointercancel', onPointerCancel)
     return () => {
+      window.removeEventListener('gargantua:engage', engageFromUi)
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
       window.removeEventListener('blur', onBlur)
       document.removeEventListener('mousemove', onMouseMove)
       document.removeEventListener('pointerlockchange', onLockChange)
+      document.removeEventListener('visibilitychange', onVisibility)
+      canvas.removeEventListener('wheel', onWheel)
       canvas.removeEventListener('pointerdown', onPointerDown)
       canvas.removeEventListener('pointermove', onPointerMove)
       canvas.removeEventListener('pointerup', onPointerUp)
-      canvas.removeEventListener('pointercancel', onPointerUp)
+      canvas.removeEventListener('pointercancel', onPointerCancel)
     }
   }, [canvas])
 
@@ -123,8 +153,18 @@ export function FlightRig() {
     const { wish, forward, euler, bl } = scratch
     const pressed = keys.current
     const horizon = horizonRadius(physics.spin)
+    const ui = getUi()
+    if (ui.orbit && !flight.autopilot && !ui.paused && intro.k < .001) {
+      const angle = dt * .025
+      const x = flight.position.x, z = flight.position.z
+      flight.position.x = x * Math.cos(angle) + z * Math.sin(angle)
+      flight.position.z = z * Math.cos(angle) - x * Math.sin(angle)
+      flight.yaw = Math.atan2(flight.position.x, flight.position.z)
+      flight.pitch = -Math.atan2(flight.position.y, Math.hypot(flight.position.x, flight.position.z))
+    }
+    if (ui.panelOpen || ui.helpOpen) { pressed.clear(); flight.velocity.set(0, 0, 0) }
 
-    if (flight.engaged && !flight.autopilot) {
+    if (flight.engaged && !flight.autopilot && !ui.panelOpen && !ui.helpOpen) {
       // 수평 이동은 요 방향 기준, 상승/하강은 세계 Y축 (크리에이티브 모드와 같은 감각)
       const f = (pressed.has('KeyW') ? 1 : 0) - (pressed.has('KeyS') ? 1 : 0) + touchInput.y
       const s = (pressed.has('KeyD') ? 1 : 0) - (pressed.has('KeyA') ? 1 : 0) + touchInput.x
@@ -133,6 +173,7 @@ export function FlightRig() {
       const cosY = Math.cos(flight.yaw)
       wish.set(-sinY * f + cosY * s, u, -cosY * f - sinY * s)
       if (wish.lengthSq() > 1) wish.normalize()
+      if (wish.lengthSq() > .001 && ui.waypoint !== null) setUi({ waypoint: null })
 
       const r = flight.position.length()
       const boost = pressed.has('ControlLeft') || pressed.has('ControlRight') || touchInput.boost ? 3 : 1
@@ -141,16 +182,15 @@ export function FlightRig() {
       flight.velocity.lerp(wish, 1 - Math.exp(-dt * 5))
       flight.position.addScaledVector(flight.velocity, dt)
 
-      // 사건의 지평선 바로 바깥(r₊ + 0.12 M)에서 멈추는 벽 — 에르고스피어 안까지는 들어갈 수 있습니다.
-      cartesianToBL(flight.position, physics.spin, bl)
-      const floor = horizon + 0.12
-      if (bl.x < floor) {
-        flight.position.multiplyScalar(floor / bl.x)
-        const radial = flight.position.clone().normalize()
-        const inward = flight.velocity.dot(radial)
-        if (inward < 0) flight.velocity.addScaledVector(radial, -inward)
-      }
       if (flight.position.length() > MAX_DISTANCE) flight.position.setLength(MAX_DISTANCE)
+    }
+
+    // Enforce the boundary for free flight AND spin edits/autopilot, in BL coordinates.
+    if (constrainFlightPosition(flight.position, physics.spin, bl)) flight.velocity.set(0, 0, 0)
+
+    if (Math.abs(camera.fov - flight.fov) > .001) {
+      camera.fov = THREE.MathUtils.lerp(camera.fov, flight.fov, 1 - Math.exp(-dt * 9))
+      camera.updateProjectionMatrix()
     }
 
     euler.set(flight.pitch, flight.yaw, physics.roll)

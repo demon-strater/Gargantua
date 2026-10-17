@@ -12,14 +12,16 @@ export type Preset = {
 /** 각 프리셋이 공통으로 되돌리는 원반·연출 값 */
 const BASE: Partial<PhysicsParams> = {
   thickness: 0.012,
-  temperature: 5800,
+  temperature: 6800,
   outer: 26,
   inner: 0,
   flow: 0,
-  roll: 0,
+  roll: -4,
   indigo: false,
   morph: false,
   morphMode: 'spin',
+  lensing: true,
+  exposure: 1,
 }
 
 export const PRESETS: Preset[] = [
@@ -28,14 +30,21 @@ export const PRESETS: Preset[] = [
     label: '실제 물리',
     note: '영화 렌더링의 스핀 a/M = 0.6에 도플러 빔과 중력 적색편이를 모두 적용한 모습',
     params: { ...BASE, spin: 0.6, beaming: 1 },
-    view: { inclination: 6, distance: 54 },
+    view: { inclination: 4.3, distance: 38 },
   },
   {
     id: 'film',
     label: '영화 연출',
     note: '영화는 관객이 혼동하지 않도록 도플러 효과를 빼고 대칭 원반으로 연출했습니다 (James et al. 2015)',
-    params: { ...BASE, spin: 0.6, beaming: 0 },
-    view: { inclination: 6, distance: 54 },
+    params: { ...BASE, spin: 0.6, beaming: 0, temperature: 6200, exposure: 1.15 },
+    view: { inclination: 4.3, distance: 38 },
+  },
+  {
+    id: 'indigo',
+    label: '인디고 난류',
+    note: '참고 영상의 인디고·백금색 난류를 재해석한 색감입니다. 색은 연출용이며 빛의 경로는 Kerr 측지선으로 계산합니다.',
+    params: { ...BASE, spin: 0.85, beaming: 0.6, temperature: 9000, indigo: true, roll: 0, flow: 0.08 },
+    view: { inclination: 3, distance: 38 },
   },
   {
     id: 'extreme',

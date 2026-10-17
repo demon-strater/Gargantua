@@ -10,22 +10,22 @@ import { useUi } from '../state/store'
  */
 export function Effects() {
   const lowTier = useUi((state) => state.tier === 'low')
-  const aberration = useMemo(() => new THREE.Vector2(0.0007, 0.0005), [])
+  const aberration = useMemo(() => new THREE.Vector2(0.00012, 0.00008), [])
 
   return (
     <EffectComposer multisampling={0} stencilBuffer={false}>
       <Bloom
         mipmapBlur
-        intensity={0.9}
-        luminanceThreshold={0.75}
+        intensity={0.58}
+        luminanceThreshold={1.05}
         luminanceSmoothing={0.3}
-        radius={0.82}
+        radius={0.75}
         levels={lowTier ? 6 : 8}
       />
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
       <ChromaticAberration offset={aberration} radialModulation modulationOffset={0.45} />
-      <Noise premultiply={false} blendFunction={BlendFunction.OVERLAY} opacity={0.16} />
-      <Vignette offset={0.24} darkness={0.82} />
+      <Noise premultiply={false} blendFunction={BlendFunction.OVERLAY} opacity={0.025} />
+      <Vignette offset={0.3} darkness={0.54} />
     </EffectComposer>
   )
 }

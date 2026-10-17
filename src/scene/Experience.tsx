@@ -6,6 +6,7 @@ import { BlackHole } from './BlackHole'
 import { FlightRig } from './FlightRig'
 import { Effects } from './Effects'
 import { StarDust } from './StarDust'
+import { ObservationCapture } from './ObservationCapture'
 
 export function Experience({ device }: { device: DeviceInfo }) {
   const initialDpr = useMemo(() => {
@@ -19,13 +20,14 @@ export function Experience({ device }: { device: DeviceInfo }) {
       flat
       dpr={initialDpr}
       gl={{ antialias: false, alpha: false, stencil: false, powerPreference: 'high-performance' }}
-      camera={{ fov: 55, near: 0.05, far: 1200, position: [0, 12, 146] }}
+      camera={{ fov: 48, near: 0.05, far: 1200, position: [0, 12, 130] }}
     >
       <AdaptiveQuality device={device} />
       <FlightRig />
       <BlackHole skySize={device.skySize} />
       <StarDust />
       <Effects />
+      <ObservationCapture />
     </Canvas>
   )
 }

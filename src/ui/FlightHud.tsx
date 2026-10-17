@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { ergosphereRadius, horizonRadius, iscoRadius, photonOrbitRadii } from '../lib/kerr'
-import { getUi, physics, telemetry, useUi } from '../state/store'
+import { getUi, physics, setUi, telemetry, useUi } from '../state/store'
+import { Icon } from './Icon'
 
 /** 우측 상단 계측값 (리렌더 없이 DOM 직접 갱신) */
 export function FlightTelemetry() {
@@ -33,15 +34,15 @@ export function FlightTelemetry() {
   return (
     <dl className="hud">
       <div>
-        <dt>Radius</dt>
+        <dt>RADIAL DISTANCE</dt>
         <dd ref={refs.r}>—</dd>
       </div>
       <div>
-        <dt>Time dilation</dt>
+        <dt>TIME DILATION</dt>
         <dd ref={refs.dilation}>—</dd>
       </div>
       <div className="hud__speed">
-        <dt>Velocity</dt>
+        <dt>FLIGHT VELOCITY</dt>
         <dd ref={refs.speed}>—</dd>
       </div>
       <div className="hud__spin">
@@ -49,7 +50,7 @@ export function FlightTelemetry() {
         <dd ref={refs.spin}>—</dd>
       </div>
       <div className="hud__render">
-        <dt>Render</dt>
+        <dt>OPTICAL RESOLUTION</dt>
         <dd ref={refs.render}>—</dd>
       </div>
     </dl>
@@ -134,15 +135,35 @@ const KEYS: [string[], string][] = [
   [['ESC'], '마우스 해제'],
   [['P'], '물리 패널'],
   [['H'], '도움말'],
+  [['WHEEL'], '시야각 확대 · 축소'],
+  [['R'], '처음 시점으로'],
+  [['V'], '시네마틱 보기'],
 ]
 
 /** 좌측 하단 조작 안내 (H로 접기) */
 export function ControlsHelp() {
   const open = useUi((state) => state.helpOpen)
+  const close = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const previous = document.activeElement as HTMLElement | null
+    close.current?.focus()
+    const escape = (event: KeyboardEvent) => { if (event.code === 'Escape') setUi({ helpOpen: false }) }
+    window.addEventListener('keydown', escape)
+    return () => { window.removeEventListener('keydown', escape); previous?.focus() }
+  }, [open])
+  if (!open) return null
   return (
-    <div className="keys" data-open={open}>
-      <p className="keys__title">FLIGHT CONTROLS</p>
-      {open && (
+    <div className="help-backdrop" onClick={() => setUi({ helpOpen: false })}>
+    <section className="keys" role="dialog" aria-modal="true" aria-labelledby="controls-title" onClick={e => e.stopPropagation()} onKeyDown={e => {
+      if (e.key !== 'Tab') return
+      const buttons = e.currentTarget.querySelectorAll<HTMLButtonElement>('button')
+      const first = buttons[0], last = buttons[buttons.length - 1]
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+    }}>
+      <header><div><p className="eyebrow">PILOT HANDBOOK / 001</p><h2 id="controls-title">자유 비행 가이드</h2></div><button ref={close} aria-label="조작 안내 닫기" onClick={() => setUi({ helpOpen: false })}><Icon name="close" /></button></header>
+      <p>마인크래프트 크리에이티브 모드처럼, 원하는 위치로 자유롭게 이동하세요.</p>
         <ul>
           {KEYS.map(([caps, label]) => (
             <li key={label}>
@@ -155,7 +176,9 @@ export function ControlsHelp() {
             </li>
           ))}
         </ul>
-      )}
+      <p className="keys__note">터치 기기에서는 왼쪽 조이스틱으로 이동하고 화면을 드래그해 둘러보세요. 오른쪽 ▲ / ▼ 버튼으로 높이를 조절합니다. 주요 영역에 접근하면 구조 스캔이 자동으로 전환됩니다.</p>
+      <button className="keys__confirm" onClick={() => setUi({ helpOpen: false })}>확인 · 관측 계속하기 <Icon name="arrow" /></button>
+    </section>
     </div>
   )
 }

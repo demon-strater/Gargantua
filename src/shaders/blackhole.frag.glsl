@@ -47,14 +47,14 @@ uniform float uPlanetOrbit;
 uniform sampler2D   uDiskTex;
 uniform samplerCube uSkyTex;
 
-const int   MAX_STEPS   = 480;
+const int   MAX_STEPS   = 680;
 const float FLOW_PERIOD = 40.0;      // flow-map 주기 (원반 시간, M)
 const float LOG_TEX_MAX = 4.158883;  // ln 64 — 원반 텍스처의 로그 반지름 범위
 const float FLUX_PEAK   = 0.07704;   // 아래 플럭스 함수의 최댓값 (정규화)
 const float POLAR_S2    = 1e-6;      // 전환점이 자전축에서 sin θ < 0.001 이내면 축을 통과하는 광선으로 처리
-const float DISK_GAIN   = 1.6;
+const float DISK_GAIN   = 2.7;
 const float OPACITY     = 1.3;
-const float HAZE        = 0.05;
+const float HAZE        = 0.018;
 const float FLOW_GAIN   = 2.2;
 const float FLOW_THETA  = 0.42;      // 고온 가스층의 각 두께 (H/r ≈ 0.4)
 
@@ -105,8 +105,8 @@ vec3 starLayer(vec3 d, float scale, float density, float sizeMul, float gain) {
 
   float mag = pow(hash13(id + 3.7), 7.0);
   float temp = mix(3000.0, 12000.0, pow(hash13(id + 9.1), 1.6));
-  float twinkle = 0.8 + 0.2 * sin(uTime * (1.3 + 4.0 * hash13(id + 1.3)) + h * 60.0);
-  return blackbody(temp) * core * visible * (0.12 + 3.5 * mag) * gain * twinkle;
+  // There is no atmospheric scintillation in space.
+  return blackbody(temp) * core * visible * (0.12 + 3.5 * mag) * gain;
 }
 
 vec3 sky(vec3 d) {
@@ -162,7 +162,7 @@ float outerFade(float rr) {
 vec3 diskField(float rr, float phi, float footprint) {
   float omega = 1.0 / (rr * sqrt(rr) + uSpin);
   float v = log(rr) / LOG_TEX_MAX;
-  float lod = max(log2(footprint / (0.0035 * rr)), 0.0);
+  float lod = max(log2(max(footprint, 1e-6) / (0.0022 * rr)), 0.0);
   float ph1 = fract(uDiskTime / FLOW_PERIOD);
   float ph2 = fract(uDiskTime / FLOW_PERIOD + 0.5);
   float w1 = 1.0 - abs(2.0 * ph1 - 1.0);
@@ -180,13 +180,13 @@ void diskCrossing(vec3 P, vec3 dir, float footprint, inout vec3 col, inout float
 
   vec3 m = diskField(rr, atan(P.z, P.x), footprint);
   float inner = smoothstep(uDiskInner * 0.8, uDiskInner * 1.1, rr);
-  float dens = smoothstep(0.26, 0.82, m.r) * (0.3 + 1.2 * m.g) * (0.55 + 0.9 * m.b) * inner * outerFade(rr);
+  float dens = smoothstep(0.23, 0.83, m.r) * (0.16 + 1.85 * m.g) * (0.55 + 0.9 * m.b) * inner * outerFade(rr);
 
   float cosI = max(abs(dir.y), uDiskThickness * 1.5);
   float tau = OPACITY * dens / cosI;
   if (tau < 1e-4) return;
 
-  vec3 S = diskSource(rr, redshift(rr), 0.88 + 0.24 * m.b, 0.3 + 1.1 * dens + 0.4 * m.g);
+  vec3 S = diskSource(rr, redshift(rr), 0.86 + 0.28 * m.b, 0.22 + 1.25 * dens + 0.65 * m.g);
   float att = exp(-tau);
   col += trans * S * (1.0 - att);
   trans *= att;
@@ -236,7 +236,13 @@ vec3 shadePlanet(vec3 hit, vec3 rd) {
   float lambert = max(dot(n, toHole), 0.0);
   float wrap = dot(n, toHole) * 0.5 + 0.5;
   vec3 diskLight = vec3(1.0, 0.72, 0.45);
-  vec3 col = vec3(0.05, 0.055, 0.06) * diskLight * (lambert * 2.4 + wrap * 0.05);
+  float continents = fbm(n * 5.0 + vec3(2.0, 9.0, 3.0), 5);
+  float cloud = smoothstep(0.05, 0.4, fbm(n * 11.0 + uTime * 0.003, 4));
+  vec3 surface = mix(vec3(0.012, 0.035, 0.052), vec3(0.085, 0.074, 0.058), smoothstep(-0.05, 0.1, continents));
+  surface = mix(surface, vec3(0.35, 0.39, 0.4), cloud * 0.6);
+  vec3 col = surface * diskLight * (lambert * 2.4 + wrap * 0.05);
+  vec3 halfVector = normalize(toHole - rd);
+  col += diskLight * pow(max(dot(n, halfVector), 0.0), 80.0) * 0.35 * (1.0 - smoothstep(-0.05, 0.1, continents));
   float rim = pow(1.0 - max(dot(n, -rd), 0.0), 5.0);
   col += vec3(0.55, 0.70, 1.0) * rim * 0.08 * (0.25 + lambert);
   return col;

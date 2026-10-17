@@ -1,4 +1,4 @@
-import { useRef, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react'
 import { useUi } from '../state/store'
 import { touchInput } from './touchInput'
 
@@ -7,10 +7,15 @@ const RADIUS = 46
 /** 모바일: 왼쪽 가상 조이스틱(이동) + 오른쪽 상승/하강/가속 버튼. 시선은 화면 드래그. */
 export function TouchControls() {
   const engaged = useUi((state) => state.engaged)
+  const blocked = useUi(s => s.panelOpen || s.helpOpen || s.cinematic)
   const knob = useRef<HTMLSpanElement>(null)
   const origin = useRef<{ id: number; x: number; y: number } | null>(null)
 
-  if (!engaged) return null
+  useEffect(() => {
+    if (!engaged || blocked) { touchInput.x = 0; touchInput.y = 0; touchInput.lift = 0; touchInput.boost = false; origin.current = null }
+    return () => { touchInput.x = 0; touchInput.y = 0; touchInput.lift = 0; touchInput.boost = false }
+  }, [engaged, blocked])
+  if (!engaged || blocked) return null
 
   const move = (x: number, y: number) => {
     const length = Math.hypot(x, y)
@@ -65,7 +70,7 @@ export function TouchControls() {
         <button
           type="button"
           aria-label="가속"
-          onPointerDown={() => (touchInput.boost = true)}
+          onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); touchInput.boost = true }}
           onPointerUp={() => (touchInput.boost = false)}
           onPointerCancel={() => (touchInput.boost = false)}
         >

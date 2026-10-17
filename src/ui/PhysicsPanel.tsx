@@ -9,6 +9,7 @@ import {
   photonOrbitRadii,
 } from '../lib/kerr'
 import { PRESETS } from '../lib/presets'
+import { Icon } from './Icon'
 import { flyToView, getUi, setUi, tweenPhysics, useUi, type MorphMode, type PhysicsParams } from '../state/store'
 
 type NumericKey = Exclude<keyof PhysicsParams, 'lensing' | 'indigo' | 'morph' | 'morphMode'>
@@ -138,8 +139,9 @@ export function PhysicsPanel() {
     <div className="panel-dock" data-open={open}>
       <section id="physics-panel" className="panel" aria-label="블랙홀 물리 파라미터" inert={!open}>
         <header className="panel__head">
-          <p className="panel__eyebrow">Kerr spacetime</p>
+          <p className="panel__eyebrow">OPTICS LAB / KERR SPACETIME</p>
           <h2 className="panel__title">물리 파라미터</h2>
+          <button className="panel__close" aria-label="물리 패널 닫기" onClick={() => setUi({ panelOpen: false })}><Icon name="close" /></button>
         </header>
 
         <div className="panel__presets" role="group" aria-label="프리셋">
@@ -150,6 +152,7 @@ export function PhysicsPanel() {
               aria-pressed={preset.id === presetId}
               onClick={() => {
                 update(preset.params, preset.id)
+                setUi({ orbit: false, waypoint: null })
                 flyToView(preset.view.inclination, preset.view.distance)
               }}
             >
@@ -262,6 +265,8 @@ export function PhysicsPanel() {
         </dl>
 
         <p className="panel__source">
+          Kerr 측지선의 수치 적분과 절차적 가스 모델입니다. 난류·온도·색은 근사이며, 완전한 유체 시뮬레이션은 아닙니다. 자유 비행은 관측용 이동입니다.
+          <br /><br />
           영화 속 이미지는 a/M = 0.6, 도플러 효과 제외로 렌더링되었습니다 —{' '}
           <a href="https://arxiv.org/abs/1502.03808" target="_blank" rel="noreferrer">
             James, von Tunzelmann, Franklin &amp; Thorne (2015)
@@ -274,9 +279,9 @@ export function PhysicsPanel() {
         className="panel-toggle"
         aria-expanded={open}
         aria-controls="physics-panel"
-        onClick={() => setUi({ panelOpen: !open })}
+        onClick={() => { if (document.pointerLockElement) document.exitPointerLock(); setUi({ panelOpen: !open, helpOpen: false }) }}
       >
-        <i /> Physics <span>{open ? '닫기' : '물리 파라미터'}</span>
+        <Icon name="sliders" /> <span>{open ? '물리 패널 닫기' : '물리 파라미터'}</span><kbd>P</kbd>
       </button>
     </div>
   )

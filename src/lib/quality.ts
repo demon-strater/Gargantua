@@ -9,9 +9,9 @@ export type QualityProfile = {
 }
 
 export const PROFILES: Record<QualityTier, QualityProfile> = {
-  low: { tier: 'low', steps: 200, stepScale: 0.075, dust: 1400, pixelBudget: 0.9e6 },
-  medium: { tier: 'medium', steps: 300, stepScale: 0.058, dust: 2800, pixelBudget: 1.8e6 },
-  high: { tier: 'high', steps: 420, stepScale: 0.045, dust: 4500, pixelBudget: 3.2e6 },
+  low: { tier: 'low', steps: 240, stepScale: 0.068, dust: 600, pixelBudget: 0.8e6 },
+  medium: { tier: 'medium', steps: 380, stepScale: 0.048, dust: 1200, pixelBudget: 1.7e6 },
+  high: { tier: 'high', steps: 640, stepScale: 0.032, dust: 2200, pixelBudget: 3.8e6 },
 }
 
 export const MAX_DUST = PROFILES.high.dust
@@ -64,7 +64,7 @@ export function profileForFactor(factor: number): QualityProfile {
  */
 export function dprForFactor(factor: number, mobile: boolean, profile: QualityProfile): number {
   const native = window.devicePixelRatio || 1
-  const [min, max] = mobile ? [0.5, Math.min(native, 1.25)] : [0.6, Math.min(native, 1.75)]
+  const [min, max] = mobile ? [0.5, Math.min(native, 1.25)] : [0.65, Math.min(Math.max(native, 1.25), 1.75)]
   const wanted = min + (max - min) * factor
   const area = window.innerWidth * window.innerHeight
   const budgetDpr = Math.sqrt(profile.pixelBudget / Math.max(area, 1))

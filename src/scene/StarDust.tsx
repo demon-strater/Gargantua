@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { activeQuality, MAX_DUST } from '../lib/quality'
+import { getUi } from '../state/store'
 
 const vertexShader = /* glsl */ `
   attribute float aSeed;
@@ -85,12 +86,14 @@ export function StarDust() {
     [geometry, material],
   )
 
-  useFrame((state) => {
-    material.uniforms.uTime.value = state.clock.elapsedTime
+  const time = useRef(0)
+  useFrame((state, delta) => {
+    if (!getUi().paused) time.current += Math.min(delta, .1)
+    material.uniforms.uTime.value = time.current
     material.uniforms.uPixelRatio.value = state.viewport.dpr
     material.uniforms.uHoleDepth.value = state.camera.position.length()
     geometry.setDrawRange(0, activeQuality.profile.dust)
-    if (group.current) group.current.rotation.y = state.clock.elapsedTime * 0.004
+    if (group.current) group.current.rotation.y = time.current * 0.004
   })
 
   return <points ref={group} geometry={geometry} material={material} frustumCulled={false} />

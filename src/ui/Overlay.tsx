@@ -1,101 +1,76 @@
-import { useLayoutEffect, useRef, type RefObject } from 'react'
+﻿import { useLayoutEffect, useRef } from 'react'
 import gsap from 'gsap'
 import type { DeviceInfo } from '../lib/quality'
-import { intro, physics, useUi } from '../state/store'
-import { ControlsHelp, EngagePrompt, FlightTelemetry, RadialGauge, Reticle } from './FlightHud'
+import { intro, physics, setUi, startFlight, useUi } from '../state/store'
+import { ControlsHelp, FlightTelemetry, RadialGauge, Reticle } from './FlightHud'
 import { PhysicsPanel } from './PhysicsPanel'
 import { ScanPopup } from './ScanPopup'
 import { TouchControls } from './TouchControls'
-
-const QUOTE = 'Somewhere, something incredible is waiting to be known.'
+import { ObservatoryControls } from './ObservatoryControls'
+import { Icon } from './Icon'
 
 export function Overlay({ device }: { device: DeviceInfo }) {
   const root = useRef<HTMLDivElement>(null)
-  const ready = useUi((state) => state.ready)
-  const engaged = useUi((state) => state.engaged)
+  const ready = useUi(s => s.ready)
+  const engaged = useUi(s => s.engaged)
+  const cinematic = useUi(s => s.cinematic)
+  const locked = useUi(s => s.pointerLocked)
   const touch = device.mobile || window.matchMedia('(pointer: coarse)').matches
 
-  useIntro(root, ready, device.reducedMotion)
-  useEngage(root, engaged)
-
-  return (
-    <div ref={root} className="overlay">
-      <div className="veil" aria-hidden="true">
-        <span className="veil__text">Calibrating spacetime</span>
-      </div>
-
-      <header className="chrome">
-        <div className="brand">
-          <span className="brand__mark">Gargantua</span>
-          <span className="brand__sub">Kerr black hole · free flight</span>
-        </div>
-        <FlightTelemetry />
-      </header>
-
-      <section className="hero">
-        <div className="hero__inner">
-          <p className="hero__eyebrow">Expedition Log · 001</p>
-          <blockquote className="quote">
-            <p>
-              {QUOTE.split(' ').map((word, i) => (
-                <span key={i} className="quote__word">
-                  {word}{' '}
-                </span>
-              ))}
-            </p>
-            <footer className="quote__cite">— Carl Sagan</footer>
-          </blockquote>
-        </div>
-      </section>
-
-      <EngagePrompt touch={touch} />
-
-      <div className="flight-layer">
-        <Reticle />
-        <RadialGauge />
-        {!touch && <ControlsHelp />}
-      </div>
-
-      <ScanPopup reducedMotion={device.reducedMotion} />
-      {touch && <TouchControls />}
-      <PhysicsPanel />
-    </div>
-  )
-}
-
-/** 셰이더 컴파일이 끝나면: 어둠 속에서 날아 들어오며 노출이 차오르고, 명언이 한 단어씩 떠오릅니다. */
-function useIntro(root: RefObject<HTMLDivElement | null>, ready: boolean, reducedMotion: boolean) {
   useLayoutEffect(() => {
     if (!ready) return
     const ctx = gsap.context(() => {
-      gsap
-        .timeline()
-        .to('.veil', { autoAlpha: 0, duration: 2.2, ease: 'power2.inOut' }, 0)
-        .fromTo(physics, { fade: 0 }, { fade: 1, duration: 4.5, ease: 'power2.out' }, 0)
-        .fromTo(intro, { k: 1 }, { k: 0, duration: reducedMotion ? 0.01 : 7, ease: 'expo.out' }, 0)
-        .fromTo('.hero__eyebrow', { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 1.6, ease: 'power3.out' }, 1.8)
-        .fromTo(
-          '.quote__word',
-          { autoAlpha: 0, y: 14, filter: 'blur(12px)' },
-          { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: 2, stagger: 0.16, ease: 'power3.out' },
-          2.4,
-        )
-        .fromTo('.quote__cite', { autoAlpha: 0, y: 8 }, { autoAlpha: 1, y: 0, duration: 1.6, ease: 'power2.out' }, '-=0.9')
-        .fromTo(['.chrome', '.panel-dock', '.engage'], { autoAlpha: 0 }, { autoAlpha: 1, duration: 1.6, stagger: 0.15, ease: 'power2.out' }, 2.2)
+      const duration = device.reducedMotion ? 0 : 2.4
+      gsap.timeline()
+        .to('.veil', { autoAlpha: 0, duration: 0.7 })
+        .to(physics, { fade: 1, duration, ease: 'power2.out' }, 0)
+        .to(intro, { k: 0, duration, ease: 'power3.out' }, 0)
+        .fromTo('.console-shell', { opacity: 0 }, { opacity: 1, duration: 0.8 }, 0.35)
     }, root)
     return () => ctx.revert()
-  }, [root, ready, reducedMotion])
-}
+  }, [ready, device.reducedMotion])
 
-/** 비행을 시작하면 명언이 물러나고 비행 HUD가 켜집니다. */
-function useEngage(root: RefObject<HTMLDivElement | null>, engaged: boolean) {
-  useLayoutEffect(() => {
-    if (!engaged) return
-    const ctx = gsap.context(() => {
-      gsap.to('.hero', { autoAlpha: 0, y: 30, duration: 1.2, ease: 'power2.in' })
-      gsap.fromTo('.flight-layer', { autoAlpha: 0 }, { autoAlpha: 1, duration: 1.4, delay: 0.4, ease: 'power2.out' })
-      gsap.set(['.chrome', '.panel-dock'], { autoAlpha: 1 })
-    }, root)
-    return () => ctx.revert()
-  }, [root, engaged])
+  return (
+    <div ref={root} className="overlay" data-cinematic={cinematic} data-engaged={engaged} data-ready={ready}>
+      <div className="veil" aria-hidden={ready}>
+        <div className="loader-orbit"><span /><i /></div>
+        <span className="veil__text">INITIALIZING OBSERVATORY</span>
+        <span className="veil__sub">시공간을 계산하는 중</span>
+      </div>
+      <div className="console-shell" inert={cinematic || !ready}>
+        <div className="screen-vignette" aria-hidden="true" />
+        <header className="chrome">
+          <div className="brand">
+            <span className="brand__symbol"><Icon name="orbit" /></span>
+            <span><span className="brand__mark">GARGANTUA<span className="brand__registered">/ 02</span></span><span className="brand__sub">DEEP SPACE OBSERVATORY</span></span>
+          </div>
+          <div className="header-mission"><span className="status-dot" /> EXPEDITION 001 <span className="slash">/</span> LIVE OBSERVATION</div>
+          <button className="header-controls" onClick={() => setUi({ helpOpen: true })}><Icon name="info" /><span>조작 안내</span><kbd>H</kbd></button>
+        </header>
+        <div className="telemetry-strip"><span className="telemetry-strip__label">TELEMETRY <i /></span><FlightTelemetry /></div>
+        <section className="mission">
+          <p className="eyebrow"><span>01</span> BEYOND THE EVENT HORIZON</p>
+          <h1>THE EDGE<br />OF <em>INFINITY.</em></h1>
+          <div className="mission__rule"><i /><span>가르강튀아 관측 프로젝트</span></div>
+          <p className="mission__description">빛이 휘어지고, 시간이 느려지는 곳.<br />미지의 시공간을 자유롭게 탐사하세요.</p>
+          <button className="flight-button" disabled={!ready} onClick={startFlight}>
+            <Icon name="flight" /><span>{engaged ? '자유 비행 계속하기' : '자유 비행 시작'}<small>{engaged ? 'RESUME EXPLORATION' : 'BEGIN EXPLORATION'}</small></span><Icon name="arrow" />
+          </button>
+          <div className="mission__coordinates"><span>CLASSIFICATION</span><strong>SUPERMASSIVE · KERR</strong><span>COORDINATE SYSTEM</span><strong>G = c = M = 1</strong></div>
+        </section>
+        <div className="scene-label scene-label--top" aria-hidden="true"><span>GARGANTUA</span><i />KERR SINGULARITY</div>
+        <div className="scene-label scene-label--bottom" aria-hidden="true"><i /> ACCRETION FLOW <span>RELATIVISTIC RAY TRACING</span></div>
+        {engaged && <Reticle />}
+        <ScanPopup reducedMotion={device.reducedMotion} />
+        <RadialGauge />
+        <ObservatoryControls />
+        <ControlsHelp />
+        <PhysicsPanel />
+        {touch && <TouchControls />}
+        {engaged && !locked && !touch && <div className="flight-hint">화면 클릭으로 시선 고정 <span>·</span> 드래그로 둘러보기 <span>·</span> <kbd>ESC</kbd> 해제</div>}
+        <div className="frame-corner frame-corner--tl" /><div className="frame-corner frame-corner--tr" /><div className="frame-corner frame-corner--bl" /><div className="frame-corner frame-corner--br" />
+      </div>
+      {cinematic && <button className="cinema-exit" onClick={() => setUi({ cinematic: false })}><Icon name="grid" /> 관측 콘솔 표시 <kbd>V</kbd></button>}
+    </div>
+  )
 }

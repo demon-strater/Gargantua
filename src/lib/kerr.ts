@@ -95,6 +95,23 @@ export function cartesianToBL(p: THREE.Vector3, a: number, out: THREE.Vector3) {
   return out
 }
 
+/** Inverse oblate-spheroidal mapping; r is a BL radius, not a Euclidean distance. */
+export function blToCartesian(r: number, theta: number, phi: number, a: number, out: THREE.Vector3) {
+  const rho = Math.sqrt(r * r + a * a) * Math.sin(theta)
+  return out.set(rho * Math.cos(phi), r * Math.cos(theta), rho * Math.sin(phi))
+}
+
+/** Keep the observation camera outside the horizon, including after spin changes. */
+export function constrainFlightPosition(position: THREE.Vector3, spin: number, scratch: THREE.Vector3) {
+  cartesianToBL(position, spin, scratch)
+  const floor = horizonRadius(spin) + .12
+  if (Number.isFinite(scratch.x) && scratch.x >= floor) return false
+  const theta = Number.isFinite(scratch.y) ? scratch.y : Math.PI / 2
+  const phi = Number.isFinite(scratch.z) ? scratch.z : Math.PI / 2
+  blToCartesian(floor, theta, phi, spin, position)
+  return true
+}
+
 /**
  * 카메라 위치에서 BL 좌표 방향(∂r, ∂θ, ∂φ)의 유클리드 단위벡터.
  * 편구면 좌표는 직교하므로 이 세 벡터가 ZAMO 관측자의 국소 정규직교 틀이 됩니다.

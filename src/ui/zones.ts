@@ -104,11 +104,11 @@ export const ZONES: Zone[] = [
   {
     id: 'photon',
     code: 'SCAN//02 · PHOTON_SPHERE',
-    titleEn: 'PHOTON SPHERE',
-    title: '광자 구',
+    titleEn: 'PHOTON REGION',
+    title: '광자 궤도 영역',
     accent: 'magenta',
     description:
-      '빛이 블랙홀 둘레를 원을 그리며 도는 불안정한 궤도들입니다. 여기서 아주 조금 벗어난 빛이 그림자 가장자리의 가느다란 광자 고리를 만듭니다. 회전 방향으로 도는 빛은 더 안쪽까지 들어올 수 있습니다.',
+      '빛이 블랙홀을 도는 불안정한 궤도들의 영역입니다. 회전하는 Kerr 블랙홀에서는 하나의 구면이 아닙니다. 이 영역을 여러 번 돌아 나온 빛이 그림자 가장자리의 가느다란 고리들을 만듭니다.',
     rows: (c) => [
       ['순행 광자 궤도', `${c.photon[0].toFixed(2)} M`],
       ['역행 광자 궤도', `${c.photon[1].toFixed(2)} M`],
@@ -186,7 +186,7 @@ export const ZONES: Zone[] = [
     description:
       '블랙홀 뒤편 원반의 빛이 휘어진 시공간을 따라 위아래로 감겨 와 고리처럼 보입니다. 가까이 갈수록 별과 은하수까지 하늘 전체가 일그러집니다.',
     rows: (c) => [
-      ['이 거리를 스치는 빛의 꺾임', `≈ ${((4 / c.r) * (180 / Math.PI)).toFixed(1)}°`],
+      ['b ≈ r 광선의 약한 장 근사', `≈ ${((4 / c.r) * (180 / Math.PI)).toFixed(1)}°`],
       ['그림자 시직경', `≈ ${shadowDiameterDeg(c.r).toFixed(1)}°`],
       ['현재 반지름', `${c.r.toFixed(1)} M`],
     ],
@@ -198,7 +198,7 @@ export const ZONES: Zone[] = [
     title: '가르강튀아',
     accent: 'cyan',
     description:
-      '태양 1억 개 질량의 회전하는 블랙홀. 가까이 날아갈수록 원반, 틀 끌림, 광자 구, 에르고스피어, 사건의 지평선의 정보가 차례로 열립니다.',
+      '빛의 경로마저 휘어지는 회전 블랙홀. 기본 질량은 태양의 1억 배입니다. 원하는 방향으로 비행하면 강착 원반부터 사건의 지평선까지, 가까운 영역의 관측 정보가 자동으로 열립니다.',
     rows: (c) => [
       ['질량', `10^${Math.log10(c.mass).toFixed(1)} M☉`],
       ['스핀 a/M', c.a.toFixed(3)],
